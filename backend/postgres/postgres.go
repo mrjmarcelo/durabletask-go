@@ -44,7 +44,7 @@ func NewPostgresOptions(host string, port uint16, database string, user string, 
 	if err != nil {
 		panic(fmt.Errorf("failed to parse the postgres connection string: %w", err))
 	}
-	conf.ConnConfig.Config.ConnectTimeout = 2 * time.Minute
+	conf.ConnConfig.ConnectTimeout = 2 * time.Minute
 	conf.MaxConnLifetime = 2 * time.Minute
 	conf.MaxConnIdleTime = 2 * time.Minute
 	conf.MaxConns = 1
@@ -138,7 +138,7 @@ func (be *postgresBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	var visibleTime *time.Time = nil
 	if delay := wi.GetAbandonDelay(); delay > 0 {
@@ -199,7 +199,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	now := time.Now().UTC()
 
@@ -207,7 +207,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	var sqlSB strings.Builder
 	sqlSB.WriteString("UPDATE Instances SET ")
 
-	sqlUpdateArgs := make([]interface{}, 0, 10)
+	sqlUpdateArgs := make([]any, 0, 10)
 	isCreated := false
 	isCompleted := false
 
@@ -219,7 +219,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 				continue
 			}
 			isCreated = true
-			sqlSB.WriteString(fmt.Sprintf("CreatedTime = $%d, Input = $%d, ", currIndex, currIndex+1))
+			fmt.Fprintf(&sqlSB, "CreatedTime = $%d, Input = $%d, ", currIndex, currIndex+1)
 			currIndex += 2
 			sqlUpdateArgs = append(sqlUpdateArgs, e.Timestamp.AsTime())
 			sqlUpdateArgs = append(sqlUpdateArgs, es.Input.GetValue())
@@ -229,7 +229,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 				continue
 			}
 			isCompleted = true
-			sqlSB.WriteString(fmt.Sprintf("CompletedTime = $%d, Output = $%d, FailureDetails = $%d, ", currIndex, currIndex+1, currIndex+2))
+			fmt.Fprintf(&sqlSB, "CompletedTime = $%d, Output = $%d, FailureDetails = $%d, ", currIndex, currIndex+1, currIndex+2)
 			currIndex += 3
 			sqlUpdateArgs = append(sqlUpdateArgs, now)
 			sqlUpdateArgs = append(sqlUpdateArgs, ec.Result.GetValue())
@@ -247,14 +247,13 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	}
 
 	if wi.State.CustomStatus != nil {
-		sqlSB.WriteString(fmt.Sprintf("CustomStatus = $%d, ", currIndex))
+		fmt.Fprintf(&sqlSB, "CustomStatus = $%d, ", currIndex)
 		currIndex++
 		sqlUpdateArgs = append(sqlUpdateArgs, wi.State.CustomStatus.Value)
 	}
 
 	// TODO: Support for stickiness, which would extend the LockExpiration
-	sqlSB.WriteString(fmt.Sprintf("RuntimeStatus = $%d, LastUpdatedTime = $%d, LockExpiration = NULL WHERE InstanceID = $%d AND LockedBy = $%d", currIndex, currIndex+1, currIndex+2, currIndex+3))
-	currIndex += 4
+	fmt.Fprintf(&sqlSB, "RuntimeStatus = $%d, LastUpdatedTime = $%d, LockExpiration = NULL WHERE InstanceID = $%d AND LockedBy = $%d", currIndex, currIndex+1, currIndex+2, currIndex+3)
 	sqlUpdateArgs = append(sqlUpdateArgs, helpers.ToRuntimeStatusString(wi.State.RuntimeStatus()), now, string(wi.InstanceID), wi.LockedBy)
 
 	result, err := tx.Exec(ctx, sqlSB.String(), sqlUpdateArgs...)
@@ -282,14 +281,14 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 		builder := strings.Builder{}
 		builder.WriteString("INSERT INTO History (InstanceID, SequenceNumber, EventPayload) VALUES ")
 		for i := 0; i < newHistoryCount; i++ {
-			builder.WriteString(fmt.Sprintf("($%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3))
+			fmt.Fprintf(&builder, "($%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3)
 			if i < newHistoryCount-1 {
 				builder.WriteString(", ")
 			}
 		}
 		query := builder.String()
 
-		args := make([]interface{}, 0, newHistoryCount*3)
+		args := make([]any, 0, newHistoryCount*3)
 		nextSequenceNumber := len(wi.State.OldEvents())
 		for _, e := range wi.State.NewEvents() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
@@ -313,14 +312,14 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 		builder := strings.Builder{}
 		builder.WriteString("INSERT INTO NewTasks (InstanceID, EventPayload) VALUES ")
 		for i := 0; i < newActivityCount; i++ {
-			builder.WriteString(fmt.Sprintf("($%d, $%d)", 2*i+1, 2*i+2))
+			fmt.Fprintf(&builder, "($%d, $%d)", 2*i+1, 2*i+2)
 			if i < newActivityCount-1 {
 				builder.WriteString(", ")
 			}
 		}
 		insertSql := builder.String()
 
-		sqlInsertArgs := make([]interface{}, 0, newActivityCount*2)
+		sqlInsertArgs := make([]any, 0, newActivityCount*2)
 		for _, e := range wi.State.PendingTasks() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
 			if err != nil {
@@ -342,14 +341,14 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 		builder := strings.Builder{}
 		builder.WriteString("INSERT INTO NewEvents (InstanceID, EventPayload, VisibleTime) VALUES ")
 		for i := 0; i < newEventCount; i++ {
-			builder.WriteString(fmt.Sprintf("($%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3))
+			fmt.Fprintf(&builder, "($%d, $%d, $%d)", 3*i+1, 3*i+2, 3*i+3)
 			if i < newEventCount-1 {
 				builder.WriteString(", ")
 			}
 		}
 		insertSql := builder.String()
 
-		sqlInsertArgs := make([]interface{}, 0, newEventCount*3)
+		sqlInsertArgs := make([]any, 0, newEventCount*3)
 		for _, e := range wi.State.PendingTimers() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
 			if err != nil {
@@ -431,7 +430,7 @@ func (be *postgresBackend) CreateOrchestrationInstance(ctx context.Context, e *b
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	var instanceID string
 	if instanceID, err = be.createOrchestrationInstanceInternal(ctx, e, tx, opts...); errors.Is(err, api.ErrIgnoreInstance) {
@@ -466,21 +465,23 @@ func (be *postgresBackend) CreateOrchestrationInstance(ctx context.Context, e *b
 
 func (be *postgresBackend) createOrchestrationInstanceInternal(ctx context.Context, e *backend.HistoryEvent, tx pgx.Tx, opts ...backend.OrchestrationIdReusePolicyOptions) (string, error) {
 	if e == nil {
-		return "", errors.New("HistoryEvent must be non-nil")
+		return "", backend.ErrNilHistoryEvent
 	} else if e.Timestamp == nil {
-		return "", errors.New("HistoryEvent must have a non-nil timestamp")
+		return "", backend.ErrNilEventTimestamp
 	}
 
 	startEvent := e.GetExecutionStarted()
 	if startEvent == nil {
-		return "", errors.New("HistoryEvent must be an ExecutionStartedEvent")
+		return "", backend.ErrNotExecutionStarted
 	}
 	instanceID := startEvent.OrchestrationInstance.InstanceId
 
 	policy := &protos.OrchestrationIdReusePolicy{}
 
 	for _, opt := range opts {
-		opt(policy)
+		if err := opt(policy); err != nil {
+			return "", err
+		}
 	}
 
 	rows, err := insertOrIgnoreInstanceTableInternal(ctx, tx, e, startEvent)
@@ -496,6 +497,12 @@ func (be *postgresBackend) createOrchestrationInstanceInternal(ctx context.Conte
 }
 
 func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx pgx.Tx, e *backend.HistoryEvent, startEvent *protos.ExecutionStartedEvent) (int64, error) {
+	var parentInstanceID *string
+	if pi := startEvent.GetParentInstance(); pi != nil {
+		if instanceID := pi.GetOrchestrationInstance().GetInstanceId(); instanceID != "" {
+			parentInstanceID = &instanceID
+		}
+	}
 	res, err := tx.Exec(
 		ctx,
 		`INSERT INTO Instances (
@@ -505,8 +512,9 @@ func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx pgx.Tx, e *back
 			ExecutionID,
 			Input,
 			RuntimeStatus,
-			CreatedTime
-		) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING`,
+			CreatedTime,
+			ParentInstanceID
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
 		startEvent.Name,
 		startEvent.Version.GetValue(),
 		startEvent.OrchestrationInstance.InstanceId,
@@ -514,6 +522,7 @@ func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx pgx.Tx, e *back
 		startEvent.Input.GetValue(),
 		"PENDING",
 		e.Timestamp.AsTime(),
+		parentInstanceID,
 	)
 	if err != nil {
 		return -1, fmt.Errorf("failed to insert into Instances table: %w", err)
@@ -632,9 +641,9 @@ func (be *postgresBackend) cleanupOrchestrationStateInternal(ctx context.Context
 
 func (be *postgresBackend) AddNewOrchestrationEvent(ctx context.Context, iid api.InstanceID, e *backend.HistoryEvent) error {
 	if e == nil {
-		return errors.New("HistoryEvent must be non-nil")
+		return backend.ErrNilHistoryEvent
 	} else if e.Timestamp == nil {
-		return errors.New("HistoryEvent must have a non-nil timestamp")
+		return backend.ErrNilEventTimestamp
 	}
 
 	eventPayload, err := backend.MarshalHistoryEvent(e)
@@ -765,7 +774,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	now := time.Now().UTC()
 	newLockExpiration := now.Add(be.options.OrchestrationLockTimeout)
@@ -913,7 +922,7 @@ func (be *postgresBackend) CompleteActivityWorkItem(ctx context.Context, wi *bac
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	bytes, err := backend.MarshalHistoryEvent(wi.Result)
 	if err != nil {
@@ -978,7 +987,7 @@ func (be *postgresBackend) PurgeOrchestrationState(ctx context.Context, id api.I
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	if err := be.cleanupOrchestrationStateInternal(ctx, tx, id, true); err != nil {
 		return err

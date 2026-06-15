@@ -3,6 +3,7 @@ package task
 import (
 	"container/list"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -132,7 +133,7 @@ func (ctx *OrchestrationContext) start() (actions []*protos.OrchestratorAction) 
 
 	defer func() {
 		result := recover()
-		if result == ErrTaskBlocked {
+		if resultErr, ok := result.(error); ok && errors.Is(resultErr, ErrTaskBlocked) {
 			// Expected, normal part of execution
 			actions = ctx.actions()
 		} else if result != nil {
@@ -143,7 +144,9 @@ func (ctx *OrchestrationContext) start() (actions []*protos.OrchestratorAction) 
 
 	for {
 		if ok, err := ctx.processNextEvent(); err != nil {
-			ctx.setFailed(err)
+			if setErr := ctx.setFailed(err); setErr != nil {
+				break
+			}
 			break
 		} else if !ok {
 			// Orchestrator finished, break out of the loop and return any pending actions
@@ -170,12 +173,13 @@ func (ctx *OrchestrationContext) processNextEvent() (bool, error) {
 func (ctx *OrchestrationContext) getNextHistoryEvent() (*protos.HistoryEvent, bool) {
 	var historyList []*protos.HistoryEvent
 	index := ctx.historyIndex
-	if ctx.historyIndex >= len(ctx.oldEvents)+len(ctx.newEvents) {
+	switch {
+	case ctx.historyIndex >= len(ctx.oldEvents)+len(ctx.newEvents):
 		return nil, false
-	} else if ctx.historyIndex < len(ctx.oldEvents) {
+	case ctx.historyIndex < len(ctx.oldEvents):
 		ctx.IsReplaying = true
 		historyList = ctx.oldEvents
-	} else {
+	default:
 		ctx.IsReplaying = false
 		historyList = ctx.newEvents
 		index -= len(ctx.oldEvents)
@@ -243,7 +247,7 @@ func (octx *OrchestrationContext) GetInput(v any) error {
 // CallActivity schedules an asynchronous invocation of an activity function. The [activity]
 // parameter can be either the name of an activity as a string or can be a pointer to the function
 // that implements the activity, in which case the name is obtained via reflection.
-func (ctx *OrchestrationContext) CallActivity(activity interface{}, opts ...callActivityOption) Task {
+func (ctx *OrchestrationContext) CallActivity(activity any, opts ...callActivityOption) Task {
 	options := new(callActivityOptions)
 	for _, configure := range opts {
 		if err := configure(options); err != nil {
@@ -262,7 +266,7 @@ func (ctx *OrchestrationContext) CallActivity(activity interface{}, opts ...call
 	return ctx.internalScheduleActivity(activity, options)
 }
 
-func (ctx *OrchestrationContext) internalScheduleActivity(activity interface{}, options *callActivityOptions) Task {
+func (ctx *OrchestrationContext) internalScheduleActivity(activity any, options *callActivityOptions) Task {
 	scheduleTaskAction := helpers.NewScheduleTaskAction(
 		ctx.getNextSequenceNumber(),
 		helpers.GetTaskFunctionName(activity),
@@ -275,7 +279,7 @@ func (ctx *OrchestrationContext) internalScheduleActivity(activity interface{}, 
 	return task
 }
 
-func (ctx *OrchestrationContext) CallSubOrchestrator(orchestrator interface{}, opts ...subOrchestratorOption) Task {
+func (ctx *OrchestrationContext) CallSubOrchestrator(orchestrator any, opts ...subOrchestratorOption) Task {
 	options := new(callSubOrchestratorOptions)
 	for _, configure := range opts {
 		if err := configure(options); err != nil {
@@ -294,7 +298,7 @@ func (ctx *OrchestrationContext) CallSubOrchestrator(orchestrator interface{}, o
 	return ctx.internalCallSubOrchestrator(orchestrator, options)
 }
 
-func (ctx *OrchestrationContext) internalCallSubOrchestrator(orchestrator interface{}, options *callSubOrchestratorOptions) Task {
+func (ctx *OrchestrationContext) internalCallSubOrchestrator(orchestrator any, options *callSubOrchestratorOptions) Task {
 	createSubOrchestrationAction := helpers.NewCreateSubOrchestrationAction(
 		ctx.getNextSequenceNumber(),
 		helpers.GetTaskFunctionName(orchestrator),
@@ -328,8 +332,7 @@ func (ctx *OrchestrationContext) internalScheduleTaskWithRetries(initialAttempt 
 
 			timerErr := ctx.createTimerInternal(nextDelay).Await(nil)
 			if timerErr != nil {
-				// TODO use errors.Join when updating golang
-				return fmt.Errorf("%v %w", timerErr, err)
+				return errors.Join(timerErr, err)
 			}
 
 			err = ctx.internalScheduleTaskWithRetries(initialAttempt, schedule, policy, retryCount+1).Await(v)
@@ -451,11 +454,12 @@ func (ctx *OrchestrationContext) onExecutionStarted(es *protos.ExecutionStartedE
 	output, appError := orchestrator(ctx)
 
 	var err error
-	if appError != nil {
+	switch {
+	case appError != nil:
 		err = ctx.setFailed(appError)
-	} else if ctx.continuedAsNew {
+	case ctx.continuedAsNew:
 		err = ctx.setContinuedAsNew()
-	} else {
+	default:
 		err = ctx.setComplete(output)
 	}
 

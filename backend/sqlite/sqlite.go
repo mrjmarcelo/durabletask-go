@@ -71,11 +71,12 @@ func NewSqliteBackend(opts *SqliteOptions, logger backend.Logger) backend.Backen
 	if opts == nil {
 		opts = NewSqliteOptions("")
 	}
-	if opts.FilePath == "" {
+	switch {
+	case opts.FilePath == "":
 		be.dsn = "file::memory:"
-	} else if !strings.HasPrefix(opts.FilePath, "file:") {
+	case !strings.HasPrefix(opts.FilePath, "file:"):
 		be.dsn = "file:" + opts.FilePath
-	} else {
+	default:
 		be.dsn = opts.FilePath
 	}
 
@@ -111,16 +112,17 @@ func (be *sqliteBackend) DeleteTaskHub(ctx context.Context) error {
 	if be.options.FilePath == "" {
 		// In-memory DB
 		return nil
-	} else {
-		// File-system DB
-		err := os.Remove(be.options.FilePath)
-		if err == nil {
-			return nil
-		} else if os.IsNotExist(err) {
-			return backend.ErrTaskHubNotFound
-		} else {
-			return fmt.Errorf("failed to delete the database: %w", err)
-		}
+	}
+
+	// File-system DB
+	err := os.Remove(be.options.FilePath)
+	switch {
+	case err == nil:
+		return nil
+	case os.IsNotExist(err):
+		return backend.ErrTaskHubNotFound
+	default:
+		return fmt.Errorf("failed to delete the database: %w", err)
 	}
 }
 
@@ -134,7 +136,7 @@ func (be *sqliteBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi *b
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	var visibleTime *time.Time = nil
 	if delay := wi.GetAbandonDelay(); delay > 0 {
@@ -195,7 +197,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	now := time.Now().UTC()
 
@@ -203,7 +205,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 	var sqlSB strings.Builder
 	sqlSB.WriteString("UPDATE Instances SET ")
 
-	sqlUpdateArgs := make([]interface{}, 0, 10)
+	sqlUpdateArgs := make([]any, 0, 10)
 	isCreated := false
 	isCompleted := false
 
@@ -273,7 +275,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 		query := "INSERT INTO History ([InstanceID], [SequenceNumber], [EventPayload]) VALUES (?, ?, ?)" +
 			strings.Repeat(", (?, ?, ?)", newHistoryCount-1)
 
-		args := make([]interface{}, 0, newHistoryCount*3)
+		args := make([]any, 0, newHistoryCount*3)
 		nextSequenceNumber := len(wi.State.OldEvents())
 		for _, e := range wi.State.NewEvents() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
@@ -297,7 +299,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 		insertSql := "INSERT INTO NewTasks ([InstanceID], [EventPayload]) VALUES (?, ?)" +
 			strings.Repeat(", (?, ?)", newActivityCount-1)
 
-		sqlInsertArgs := make([]interface{}, 0, newActivityCount*2)
+		sqlInsertArgs := make([]any, 0, newActivityCount*2)
 		for _, e := range wi.State.PendingTasks() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
 			if err != nil {
@@ -319,7 +321,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 		insertSql := "INSERT INTO NewEvents ([InstanceID], [EventPayload], [VisibleTime]) VALUES (?, ?, ?)" +
 			strings.Repeat(", (?, ?, ?)", newEventCount-1)
 
-		sqlInsertArgs := make([]interface{}, 0, newEventCount*3)
+		sqlInsertArgs := make([]any, 0, newEventCount*3)
 		for _, e := range wi.State.PendingTimers() {
 			eventPayload, err := backend.MarshalHistoryEvent(e)
 			if err != nil {
@@ -337,7 +339,7 @@ func (be *sqliteBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi *
 					OperationStatus: []protos.OrchestrationStatus{protos.OrchestrationStatus_ORCHESTRATION_STATUS_FAILED},
 					Action:          api.REUSE_ID_ACTION_TERMINATE,
 				})); err != nil {
-					if err == backend.ErrDuplicateEvent {
+					if errors.Is(err, backend.ErrDuplicateEvent) {
 						be.logger.Warnf(
 							"%v: dropping sub-orchestration creation event because an instance with the target ID (%v) already exists.",
 							wi.InstanceID,
@@ -401,7 +403,7 @@ func (be *sqliteBackend) CreateOrchestrationInstance(ctx context.Context, e *bac
 	if err != nil {
 		return fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	var instanceID string
 	if instanceID, err = be.createOrchestrationInstanceInternal(ctx, e, tx, opts...); errors.Is(err, api.ErrIgnoreInstance) {
@@ -436,21 +438,23 @@ func (be *sqliteBackend) CreateOrchestrationInstance(ctx context.Context, e *bac
 
 func (be *sqliteBackend) createOrchestrationInstanceInternal(ctx context.Context, e *backend.HistoryEvent, tx *sql.Tx, opts ...backend.OrchestrationIdReusePolicyOptions) (string, error) {
 	if e == nil {
-		return "", errors.New("HistoryEvent must be non-nil")
+		return "", backend.ErrNilHistoryEvent
 	} else if e.Timestamp == nil {
-		return "", errors.New("HistoryEvent must have a non-nil timestamp")
+		return "", backend.ErrNilEventTimestamp
 	}
 
 	startEvent := e.GetExecutionStarted()
 	if startEvent == nil {
-		return "", errors.New("HistoryEvent must be an ExecutionStartedEvent")
+		return "", backend.ErrNotExecutionStarted
 	}
 	instanceID := startEvent.OrchestrationInstance.InstanceId
 
 	policy := &protos.OrchestrationIdReusePolicy{}
 
 	for _, opt := range opts {
-		opt(policy)
+		if err := opt(policy); err != nil {
+			return "", err
+		}
 	}
 
 	rows, err := insertOrIgnoreInstanceTableInternal(ctx, tx, e, startEvent)
@@ -466,6 +470,12 @@ func (be *sqliteBackend) createOrchestrationInstanceInternal(ctx context.Context
 }
 
 func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx *sql.Tx, e *backend.HistoryEvent, startEvent *protos.ExecutionStartedEvent) (int64, error) {
+	var parentInstanceID *string
+	if pi := startEvent.GetParentInstance(); pi != nil {
+		if instanceID := pi.GetOrchestrationInstance().GetInstanceId(); instanceID != "" {
+			parentInstanceID = &instanceID
+		}
+	}
 	res, err := tx.ExecContext(
 		ctx,
 		`INSERT OR IGNORE INTO [Instances] (
@@ -475,8 +485,9 @@ func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx *sql.Tx, e *bac
 			[ExecutionID],
 			[Input],
 			[RuntimeStatus],
-			[CreatedTime]
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			[CreatedTime],
+			[ParentInstanceID]
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		startEvent.Name,
 		startEvent.Version.GetValue(),
 		startEvent.OrchestrationInstance.InstanceId,
@@ -484,6 +495,7 @@ func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx *sql.Tx, e *bac
 		startEvent.Input.GetValue(),
 		"PENDING",
 		e.Timestamp.AsTime(),
+		parentInstanceID,
 	)
 	if err != nil {
 		return -1, fmt.Errorf("failed to insert into [Instances] table: %w", err)
@@ -535,7 +547,7 @@ func (be *sqliteBackend) handleInstanceExists(ctx context.Context, tx *sql.Tx, s
 
 		// should never happen, because we clean up instance before create new one
 		if rows <= 0 {
-			return fmt.Errorf("failed to insert into [Instances] table because entry already exists.")
+			return fmt.Errorf("failed to insert into [Instances] table because entry already exists")
 		}
 		return nil
 	}
@@ -606,9 +618,9 @@ func (be *sqliteBackend) cleanupOrchestrationStateInternal(ctx context.Context, 
 
 func (be *sqliteBackend) AddNewOrchestrationEvent(ctx context.Context, iid api.InstanceID, e *backend.HistoryEvent) error {
 	if e == nil {
-		return errors.New("HistoryEvent must be non-nil")
+		return backend.ErrNilHistoryEvent
 	} else if e.Timestamp == nil {
-		return errors.New("HistoryEvent must have a non-nil timestamp")
+		return backend.ErrNilEventTimestamp
 	}
 
 	eventPayload, err := backend.MarshalHistoryEvent(e)
@@ -644,7 +656,7 @@ func (be *sqliteBackend) GetOrchestrationMetadata(ctx context.Context, iid api.I
 	)
 
 	err := row.Err()
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, api.ErrInstanceNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to query the Instances table: %w", row.Err())
@@ -662,7 +674,7 @@ func (be *sqliteBackend) GetOrchestrationMetadata(ctx context.Context, iid api.I
 
 	var failureDetailsPayload []byte
 	err = row.Scan(&instanceID, &name, &runtimeStatus, &createdAt, &lastUpdatedAt, &input, &output, &customStatus, &failureDetailsPayload)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, api.ErrInstanceNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to scan the Instances table result: %w", err)
@@ -745,7 +757,7 @@ func (be *sqliteBackend) GetOrchestrationWorkItem(ctx context.Context) (*backend
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	now := time.Now().UTC()
 	newLockExpiration := now.Add(be.options.OrchestrationLockTimeout)
@@ -897,7 +909,7 @@ func (be *sqliteBackend) CompleteActivityWorkItem(ctx context.Context, wi *backe
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	bytes, err := backend.MarshalHistoryEvent(wi.Result)
 	if err != nil {
@@ -962,7 +974,7 @@ func (be *sqliteBackend) PurgeOrchestrationState(ctx context.Context, id api.Ins
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // rollback after commit is a no-op
 
 	if err := be.cleanupOrchestrationStateInternal(ctx, tx, id, true); err != nil {
 		return err
