@@ -64,7 +64,11 @@ func NewPostgresBackend(opts *PostgresOptions, logger backend.Logger) backend.Ba
 	}
 
 	pid := os.Getpid()
-	uuidStr := uuid.NewString()
+	u, err := uuid.NewV7()
+	if err != nil {
+		return nil
+	}
+	uuidStr := u.String()
 
 	if opts == nil {
 		opts = NewPostgresOptions("localhost", 5432, "postgres", "postgres", "postgres")
@@ -789,7 +793,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.SequenceNumber ASC
+			ORDER BY I.InstanceID, I.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
@@ -889,7 +893,7 @@ func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.Ac
 		WHERE SequenceNumber = (
 			SELECT SequenceNumber FROM NewTasks T
 			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
-			ORDER BY T.SequenceNumber ASC
+			ORDER BY T.InstanceID, T.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING SequenceNumber, InstanceID, EventPayload`,

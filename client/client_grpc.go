@@ -39,7 +39,12 @@ func (c *TaskHubGrpcClient) ScheduleNewOrchestration(ctx context.Context, orches
 		}
 	}
 	if req.InstanceId == "" {
-		req.InstanceId = uuid.NewString()
+		u, err := uuid.NewV7()
+		if err != nil {
+			return api.EmptyInstanceID, fmt.Errorf("failed to create uuid: %w", err)
+		}
+
+		req.InstanceId = u.String()
 	}
 
 	resp, err := c.client.StartInstance(ctx, req)
