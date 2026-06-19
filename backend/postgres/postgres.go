@@ -790,7 +790,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
 			ORDER BY I.SequenceNumber ASC
-			LIMIT 1
+			LIMIT 1000
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
 		be.workerName,     // LockedBy for Instances table
