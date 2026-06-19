@@ -790,7 +790,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
 			ORDER BY I.SequenceNumber ASC
-			LIMIT 1000
+			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
 		be.workerName,     // LockedBy for Instances table
@@ -827,30 +827,42 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	}
 	defer events.Close()
 
-	maxDequeueCount := int32(0)
+	type rawEvent struct {
+		payload []byte
+		dequeue int32
+	}
 
-	newEvents := make([]*protos.HistoryEvent, 0, 10)
+	rawEvents := []rawEvent{}
 	for events.Next() {
 		var eventPayload []byte
 		var dequeueCount int32
 		if err := events.Scan(&eventPayload, &dequeueCount); err != nil {
 			return nil, fmt.Errorf("failed to read history event: %w", err)
 		}
+		rawEvents = append(rawEvents, rawEvent{
+			payload: eventPayload,
+			dequeue: dequeueCount,
+		})
+	}
+	events.Close()
 
-		if dequeueCount > maxDequeueCount {
-			maxDequeueCount = dequeueCount
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to update orchestration work-item: %w", err)
+	}
+
+	maxDequeueCount := int32(0)
+	newEvents := make([]*protos.HistoryEvent, 0, len(rawEvents))
+	for _, e := range rawEvents {
+		if e.dequeue > maxDequeueCount {
+			maxDequeueCount = e.dequeue
 		}
 
-		e, err := backend.UnmarshalHistoryEvent(eventPayload)
+		evt, err := backend.UnmarshalHistoryEvent(e.payload)
 		if err != nil {
 			return nil, err
 		}
 
-		newEvents = append(newEvents, e)
-	}
-
-	if err = tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("failed to update orchestration work-item: %w", err)
+		newEvents = append(newEvents, evt)
 	}
 
 	wi := &backend.OrchestrationWorkItem{
