@@ -140,7 +140,7 @@ func (be *postgresBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi 
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
-	var visibleTime*time.Time = nil
+	var visibleTime *time.Time = nil
 	if delay := wi.GetAbandonDelay(); delay > 0 {
 		t := time.Now().UTC().Add(delay)
 		visibleTime = &t
@@ -769,7 +769,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
 
 	now := time.Now().UTC()
-	newLockExpiration:= now.Add(be.options.OrchestrationLockTimeout)
+	newLockExpiration := now.Add(be.options.OrchestrationLockTimeout)
 
 	// Place a lock on an orchestration instance that has new events that are ready to be executed.
 	row := tx.QueryRow(
@@ -782,7 +782,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
 			ORDER BY I.SequenceNumber ASC
-			LIMIT 1
+			LIMIT 1000
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
 		be.workerName,     // LockedBy for Instances table
