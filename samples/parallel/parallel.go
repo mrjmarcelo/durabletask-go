@@ -117,7 +117,10 @@ func GetDevicesToUpdate(task.ActivityContext) (any, error) {
 	const deviceCount = 10
 	deviceIDs := make([]string, deviceCount)
 	for i := 0; i < deviceCount; i++ {
-		u, _ := uuid.NewV7()
+		u, err := uuid.NewV7()
+ 		if err != nil {
+ 			return nil, err
+ 		}
 		deviceIDs[i] = u.String()
 	}
 	return deviceIDs, nil

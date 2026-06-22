@@ -14,7 +14,10 @@ func GetDefaultWorkerName() string {
 	}
 
 	pid := os.Getpid()
-	u, _ := uuid.NewV7()
-	uuidStr := u.String()
+	uuidStr := uuid.NewString()
+ 	u, err := uuid.NewV7()
+ 	if err == nil {
+ 		uuidStr = u.String()
+ 	}
 	return fmt.Sprintf("%v,%d,%v", hostname, pid, uuidStr)
 }

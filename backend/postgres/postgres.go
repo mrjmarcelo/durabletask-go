@@ -66,7 +66,7 @@ func NewPostgresBackend(opts *PostgresOptions, logger backend.Logger) backend.Ba
 	pid := os.Getpid()
 	u, err := uuid.NewV7()
 	if err != nil {
-		return nil
+		u = uuid.New()
 	}
 	uuidStr := u.String()
 
