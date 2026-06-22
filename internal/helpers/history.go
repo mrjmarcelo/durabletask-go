@@ -23,7 +23,7 @@ func NewExecutionStartedEvent(
 ) *protos.HistoryEvent {
 	u, err := uuid.NewV7()
 	if err != nil {
-		return nil
+		u = uuid.New()
 	}
 	return &protos.HistoryEvent{
 		EventId:   -1,
