@@ -1147,7 +1147,7 @@ CREATE INDEX IF NOT EXISTS IX_NewTasks_0027_LockExpiration_InstanceID_SequenceNu
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0028_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0028(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0029_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0029(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0030_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0030(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
-CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0031(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0031(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS_NULL;
 
 
 -- Simple index for cleanup operations (full index, not partial)
