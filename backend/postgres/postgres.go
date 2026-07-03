@@ -613,6 +613,8 @@ func (be *postgresBackend) cleanupOrchestrationStateInternal(ctx context.Context
 		return fmt.Errorf("failed to scan instance existence: %w", err)
 	}
 
+	var err error
+
 	if requireCompleted {
 		// purge orchestration in ['COMPLETED', 'FAILED', 'TERMINATED']
 		dbResult, err := tx.Exec(ctx, "DELETE FROM Instances WHERE InstanceID = $1 AND RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED')", string(id))
@@ -629,25 +631,28 @@ func (be *postgresBackend) cleanupOrchestrationStateInternal(ctx context.Context
 		}
 	} else {
 		// clean up orchestration in all RuntimeStatus
-		_, err := tx.Exec(ctx, "DELETE FROM Instances WHERE InstanceID = $1", string(id))
+		_, err = tx.Exec(ctx, "DELETE FROM Instances WHERE InstanceID = $1", string(id))
 		if err != nil {
 			return fmt.Errorf("failed to delete from the Instances table: %w", err)
 		}
 	}
 
-	_, err := tx.Exec(ctx, "DELETE FROM History WHERE InstanceID = $1", string(id))
+	// Combine all DELETEs into a single query using CTE
+	_, err = tx.Exec(ctx, `
+		WITH deleted_history AS (
+			DELETE FROM History WHERE InstanceID = $1 RETURNING 1
+		),
+		deleted_newevents AS (
+			DELETE FROM NewEvents WHERE InstanceID = $1 RETURNING 1
+		),
+		deleted_newtasks AS (
+			DELETE FROM NewTasks WHERE InstanceID = $1 RETURNING 1
+		)
+		SELECT 1 FROM deleted_history, deleted_newevents, deleted_newtasks`,
+		string(id),
+	)
 	if err != nil {
-		return fmt.Errorf("failed to delete from History table: %w", err)
-	}
-
-	_, err = tx.Exec(ctx, "DELETE FROM NewEvents WHERE InstanceID = $1", string(id))
-	if err != nil {
-		return fmt.Errorf("failed to delete from NewEvents table: %w", err)
-	}
-
-	_, err = tx.Exec(ctx, "DELETE FROM NewTasks WHERE InstanceID = $1", string(id))
-	if err != nil {
-		return fmt.Errorf("failed to delete from NewTasks table: %w", err)
+		return fmt.Errorf("failed to delete from related tables: %w", err)
 	}
 	return nil
 }
@@ -946,43 +951,64 @@ func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchS
 		return nil, backend.ErrNoWorkItems
 	}
 
-	// Fetch events for all instances
-	workItems := make([]*backend.OrchestrationWorkItem, 0, len(instanceIDs))
-	for _, instanceID := range instanceIDs {
-		events, err := tx.Query(
-			ctx,
-			`UPDATE NewEvents SET DequeueCount = DequeueCount + 1, LockedBy = $1 
-			WHERE SequenceNumber IN (
-				SELECT SequenceNumber FROM NewEvents
-				WHERE InstanceID = $2 AND (VisibleTime IS NULL OR VisibleTime <= $3)
-				LIMIT 1000
-			)
-			RETURNING EventPayload, DequeueCount`,
-			be.workerName,
-			instanceID,
-			now,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query events for instance %s: %w", instanceID, err)
-		}
+	// Fetch all events for all instances in a single query
+	instanceIDParams := make([]any, len(instanceIDs))
+	for i, id := range instanceIDs {
+		instanceIDParams[i] = id
+	}
 
-		type rawEvent struct {
+	// Build dynamic IN clause
+	inClause := make([]string, len(instanceIDs))
+	for i := range instanceIDs {
+		inClause[i] = fmt.Sprintf("$%d", i+1)
+	}
+
+	eventsQuery := fmt.Sprintf(
+		`UPDATE NewEvents SET DequeueCount = DequeueCount + 1, LockedBy = $%d
+		WHERE InstanceID IN (%s) AND (VisibleTime IS NULL OR VisibleTime <= $%d)
+		RETURNING InstanceID, EventPayload, DequeueCount`,
+		len(instanceIDs)+1,
+		strings.Join(inClause, ","),
+		len(instanceIDs)+2,
+	)
+
+	events, err := tx.Query(
+		ctx,
+		eventsQuery,
+		append(append([]any{}, instanceIDParams...), be.workerName, now)...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query events for instances: %w", err)
+	}
+	defer events.Close()
+
+	// Group events by instance ID
+	eventsByInstance := make(map[string][]struct {
+		payload []byte
+		dequeue int32
+	})
+	for events.Next() {
+		var instanceID string
+		var eventPayload []byte
+		var dequeueCount int32
+		if err := events.Scan(&instanceID, &eventPayload, &dequeueCount); err != nil {
+			return nil, fmt.Errorf("failed to read history event: %w", err)
+		}
+		eventsByInstance[instanceID] = append(eventsByInstance[instanceID], struct {
 			payload []byte
 			dequeue int32
+		}{payload: eventPayload, dequeue: dequeueCount})
+	}
+	events.Close()
+
+	// Build work items
+	workItems := make([]*backend.OrchestrationWorkItem, 0, len(instanceIDs))
+	for _, instanceID := range instanceIDs {
+		rawEvents := eventsByInstance[instanceID]
+		if len(rawEvents) == 0 {
+			// Instance was locked but has no events - skip
+			continue
 		}
-		rawEvents := []rawEvent{}
-		for events.Next() {
-			var eventPayload []byte
-			var dequeueCount int32
-			if err := events.Scan(&eventPayload, &dequeueCount); err != nil {
-				return nil, fmt.Errorf("failed to read history event: %w", err)
-			}
-			rawEvents = append(rawEvents, rawEvent{
-				payload: eventPayload,
-				dequeue: dequeueCount,
-			})
-		}
-		events.Close()
 
 		maxDequeueCount := int32(0)
 		newEvents := make([]*protos.HistoryEvent, 0, len(rawEvents))
