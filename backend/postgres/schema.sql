@@ -49,6 +49,14 @@ CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_SequenceNumber ON Instances(I
 -- Index for abandon/complete operations (WHERE InstanceID = $1 AND LockedBy = $2)
 CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_LockedBy ON Instances(InstanceID, LockedBy);
 
+-- Index for locking queries with ORDER BY (LockExpiration, InstanceID, SequenceNumber)
+CREATE INDEX IF NOT EXISTS IX_Instances_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON Instances(LockExpiration, InstanceID, SequenceNumber)
+WHERE LockExpiration IS NULL;
+
+-- Index for purge operations (WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED'))
+CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_WHERE_RuntimeStatus_IN_COMPLETED_FAILED_TERMINATED ON Instances(RuntimeStatus)
+WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED');
+
 -- ============================================================================
 -- History Table (with performance optimizations)
 -- ============================================================================
@@ -470,6 +478,72 @@ CREATE INDEX IF NOT EXISTS IX_NewEvents_0029_InstanceID_VisibleTime_DequeueCount
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0030_InstanceID_VisibleTime_DequeueCount_WHERE_LockedBy_IS_NULL ON NewEvents_0030(InstanceID, VisibleTime, DequeueCount) WHERE LockedBy IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0031_InstanceID_VisibleTime_DequeueCount_WHERE_LockedBy_IS_NULL ON NewEvents_0031(InstanceID, VisibleTime, DequeueCount) WHERE LockedBy IS NULL;
 
+-- Index for abandon operations (WHERE InstanceID = $1 AND LockedBy = $2)
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0000_InstanceID_LockedBy ON NewEvents_0000(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0001_InstanceID_LockedBy ON NewEvents_0001(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0002_InstanceID_LockedBy ON NewEvents_0002(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0003_InstanceID_LockedBy ON NewEvents_0003(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0004_InstanceID_LockedBy ON NewEvents_0004(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0005_InstanceID_LockedBy ON NewEvents_0005(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0006_InstanceID_LockedBy ON NewEvents_0006(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0007_InstanceID_LockedBy ON NewEvents_0007(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0008_InstanceID_LockedBy ON NewEvents_0008(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0009_InstanceID_LockedBy ON NewEvents_0009(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0010_InstanceID_LockedBy ON NewEvents_0010(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0011_InstanceID_LockedBy ON NewEvents_0011(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0012_InstanceID_LockedBy ON NewEvents_0012(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0013_InstanceID_LockedBy ON NewEvents_0013(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0014_InstanceID_LockedBy ON NewEvents_0014(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0015_InstanceID_LockedBy ON NewEvents_0015(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0016_InstanceID_LockedBy ON NewEvents_0016(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0017_InstanceID_LockedBy ON NewEvents_0017(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0018_InstanceID_LockedBy ON NewEvents_0018(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0019_InstanceID_LockedBy ON NewEvents_0019(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0020_InstanceID_LockedBy ON NewEvents_0020(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0021_InstanceID_LockedBy ON NewEvents_0021(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0022_InstanceID_LockedBy ON NewEvents_0022(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0023_InstanceID_LockedBy ON NewEvents_0023(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0024_InstanceID_LockedBy ON NewEvents_0024(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0025_InstanceID_LockedBy ON NewEvents_0025(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0026_InstanceID_LockedBy ON NewEvents_0026(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0027_InstanceID_LockedBy ON NewEvents_0027(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0028_InstanceID_LockedBy ON NewEvents_0028(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0029_InstanceID_LockedBy ON NewEvents_0029(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0030_InstanceID_LockedBy ON NewEvents_0030(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0031_InstanceID_LockedBy ON NewEvents_0031(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0032_InstanceID_LockedBy ON NewEvents_0032(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0033_InstanceID_LockedBy ON NewEvents_0033(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0034_InstanceID_LockedBy ON NewEvents_0034(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0035_InstanceID_LockedBy ON NewEvents_0035(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0036_InstanceID_LockedBy ON NewEvents_0036(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0037_InstanceID_LockedBy ON NewEvents_0037(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0038_InstanceID_LockedBy ON NewEvents_0038(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0039_InstanceID_LockedBy ON NewEvents_0039(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0040_InstanceID_LockedBy ON NewEvents_0040(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0041_InstanceID_LockedBy ON NewEvents_0041(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0042_InstanceID_LockedBy ON NewEvents_0042(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0043_InstanceID_LockedBy ON NewEvents_0043(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0044_InstanceID_LockedBy ON NewEvents_0044(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0045_InstanceID_LockedBy ON NewEvents_0045(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0046_InstanceID_LockedBy ON NewEvents_0046(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0047_InstanceID_LockedBy ON NewEvents_0047(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0048_InstanceID_LockedBy ON NewEvents_0048(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0049_InstanceID_LockedBy ON NewEvents_0049(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0050_InstanceID_LockedBy ON NewEvents_0050(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0051_InstanceID_LockedBy ON NewEvents_0051(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0052_InstanceID_LockedBy ON NewEvents_0052(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0053_InstanceID_LockedBy ON NewEvents_0053(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0054_InstanceID_LockedBy ON NewEvents_0054(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0055_InstanceID_LockedBy ON NewEvents_0055(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0056_InstanceID_LockedBy ON NewEvents_0056(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0057_InstanceID_LockedBy ON NewEvents_0057(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0058_InstanceID_LockedBy ON NewEvents_0058(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0059_InstanceID_LockedBy ON NewEvents_0059(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0060_InstanceID_LockedBy ON NewEvents_0060(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0061_InstanceID_LockedBy ON NewEvents_0061(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0062_InstanceID_LockedBy ON NewEvents_0062(InstanceID, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0063_InstanceID_LockedBy ON NewEvents_0063(InstanceID, LockedBy);
+
 -- Full index for ORDER BY InstanceID, SequenceNumber (supports all rows)
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0000_InstanceID_SequenceNumber ON NewEvents_0000(InstanceID, SequenceNumber);
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0001_InstanceID_SequenceNumber ON NewEvents_0001(InstanceID, SequenceNumber);
@@ -503,6 +577,38 @@ CREATE INDEX IF NOT EXISTS IX_NewEvents_0028_InstanceID_SequenceNumber ON NewEve
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0029_InstanceID_SequenceNumber ON NewEvents_0029(InstanceID, SequenceNumber);
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0030_InstanceID_SequenceNumber ON NewEvents_0030(InstanceID, SequenceNumber);
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0031_InstanceID_SequenceNumber ON NewEvents_0031(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0032_InstanceID_SequenceNumber ON NewEvents_0032(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0033_InstanceID_SequenceNumber ON NewEvents_0033(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0034_InstanceID_SequenceNumber ON NewEvents_0034(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0035_InstanceID_SequenceNumber ON NewEvents_0035(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0036_InstanceID_SequenceNumber ON NewEvents_0036(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0037_InstanceID_SequenceNumber ON NewEvents_0037(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0038_InstanceID_SequenceNumber ON NewEvents_0038(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0039_InstanceID_SequenceNumber ON NewEvents_0039(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0040_InstanceID_SequenceNumber ON NewEvents_0040(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0041_InstanceID_SequenceNumber ON NewEvents_0041(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0042_InstanceID_SequenceNumber ON NewEvents_0042(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0043_InstanceID_SequenceNumber ON NewEvents_0043(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0044_InstanceID_SequenceNumber ON NewEvents_0044(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0045_InstanceID_SequenceNumber ON NewEvents_0045(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0046_InstanceID_SequenceNumber ON NewEvents_0046(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0047_InstanceID_SequenceNumber ON NewEvents_0047(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0048_InstanceID_SequenceNumber ON NewEvents_0048(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0049_InstanceID_SequenceNumber ON NewEvents_0049(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0050_InstanceID_SequenceNumber ON NewEvents_0050(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0051_InstanceID_SequenceNumber ON NewEvents_0051(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0052_InstanceID_SequenceNumber ON NewEvents_0052(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0053_InstanceID_SequenceNumber ON NewEvents_0053(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0054_InstanceID_SequenceNumber ON NewEvents_0054(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0055_InstanceID_SequenceNumber ON NewEvents_0055(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0056_InstanceID_SequenceNumber ON NewEvents_0056(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0057_InstanceID_SequenceNumber ON NewEvents_0057(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0058_InstanceID_SequenceNumber ON NewEvents_0058(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0059_InstanceID_SequenceNumber ON NewEvents_0059(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0060_InstanceID_SequenceNumber ON NewEvents_0060(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0061_InstanceID_SequenceNumber ON NewEvents_0061(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0062_InstanceID_SequenceNumber ON NewEvents_0062(InstanceID, SequenceNumber);
+CREATE INDEX IF NOT EXISTS IX_NewEvents_0063_InstanceID_SequenceNumber ON NewEvents_0063(InstanceID, SequenceNumber);
 
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0032_InstanceID_SequenceNumber_WHERE_LockedBy_IS_NULL ON NewEvents_0032(InstanceID, SequenceNumber) WHERE LockedBy IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0033_InstanceID_SequenceNumber_WHERE_LockedBy_IS_NULL ON NewEvents_0033(InstanceID, SequenceNumber) WHERE LockedBy IS NULL;
@@ -1009,6 +1115,40 @@ CREATE INDEX IF NOT EXISTS IX_NewTasks_0029_LockExpiration_SequenceNumber_WHERE_
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0030_LockExpiration_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0030(LockExpiration, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExpiration_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0031(LockExpiration, SequenceNumber) WHERE LockExpiration IS NULL;
 
+-- Index for locking queries with ORDER BY (LockExpiration, InstanceID, SequenceNumber)
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0000_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0000(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0001_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0001(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0002_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0002(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0003_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0003(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0004_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0004(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0005_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0005(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0006_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0006(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0007_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0007(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0008_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0008(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0009_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0009(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0010_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0010(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0011_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0011(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0012_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0012(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0013_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0013(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0014_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0014(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0015_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0015(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0016_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0016(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0017_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0017(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0018_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0018(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0019_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0019(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0020_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0020(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0021_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0021(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0022_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0022(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0023_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0023(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0024_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0024(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0025_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0025(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0026_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0026(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0027_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0027(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0028_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0028(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0029_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0029(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0030_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0030(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0031(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+
 
 -- Simple index for cleanup operations (full index, not partial)
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0000_InstanceID ON NewTasks_0000(InstanceID);
@@ -1143,6 +1283,106 @@ CREATE INDEX IF NOT EXISTS IX_NewTasks_0060_LockExpiration_SequenceNumber_WHERE_
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0061_LockExpiration_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0061(LockExpiration, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0062_LockExpiration_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0062(LockExpiration, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0063_LockExpiration_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0063(LockExpiration, SequenceNumber) WHERE LockExpiration IS NULL;
+
+-- Index for locking queries with ORDER BY (LockExpiration, InstanceID, SequenceNumber) - partitions 32-63
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0032_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0032(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0033_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0033(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0034_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0034(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0035_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0035(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0036_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0036(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0037_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0037(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0038_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0038(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0039_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0039(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0040_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0040(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0041_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0041(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0042_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0042(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0043_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0043(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0044_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0044(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0045_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0045(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0046_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0046(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0047_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0047(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0048_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0048(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0049_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0049(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0050_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0050(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0051_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0051(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0052_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0052(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0053_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0053(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0054_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0054(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0055_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0055(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0056_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0056(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0057_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0057(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0058_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0058(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0059_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0059(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0060_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0060(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0061_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0061(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0062_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0062(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0063_LockExpiration_InstanceID_SequenceNumber_WHERE_LockExpiration_IS_NULL ON NewTasks_0063(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
+
+-- Index for complete/abandon activity operations (WHERE SequenceNumber = $1 AND LockedBy = $2)
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0000_SequenceNumber_LockedBy ON NewTasks_0000(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0001_SequenceNumber_LockedBy ON NewTasks_0001(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0002_SequenceNumber_LockedBy ON NewTasks_0002(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0003_SequenceNumber_LockedBy ON NewTasks_0003(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0004_SequenceNumber_LockedBy ON NewTasks_0004(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0005_SequenceNumber_LockedBy ON NewTasks_0005(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0006_SequenceNumber_LockedBy ON NewTasks_0006(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0007_SequenceNumber_LockedBy ON NewTasks_0007(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0008_SequenceNumber_LockedBy ON NewTasks_0008(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0009_SequenceNumber_LockedBy ON NewTasks_0009(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0010_SequenceNumber_LockedBy ON NewTasks_0010(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0011_SequenceNumber_LockedBy ON NewTasks_0011(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0012_SequenceNumber_LockedBy ON NewTasks_0012(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0013_SequenceNumber_LockedBy ON NewTasks_0013(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0014_SequenceNumber_LockedBy ON NewTasks_0014(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0015_SequenceNumber_LockedBy ON NewTasks_0015(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0016_SequenceNumber_LockedBy ON NewTasks_0016(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0017_SequenceNumber_LockedBy ON NewTasks_0017(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0018_SequenceNumber_LockedBy ON NewTasks_0018(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0019_SequenceNumber_LockedBy ON NewTasks_0019(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0020_SequenceNumber_LockedBy ON NewTasks_0020(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0021_SequenceNumber_LockedBy ON NewTasks_0021(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0022_SequenceNumber_LockedBy ON NewTasks_0022(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0023_SequenceNumber_LockedBy ON NewTasks_0023(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0024_SequenceNumber_LockedBy ON NewTasks_0024(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0025_SequenceNumber_LockedBy ON NewTasks_0025(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0026_SequenceNumber_LockedBy ON NewTasks_0026(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0027_SequenceNumber_LockedBy ON NewTasks_0027(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0028_SequenceNumber_LockedBy ON NewTasks_0028(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0029_SequenceNumber_LockedBy ON NewTasks_0029(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0030_SequenceNumber_LockedBy ON NewTasks_0030(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_SequenceNumber_LockedBy ON NewTasks_0031(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0032_SequenceNumber_LockedBy ON NewTasks_0032(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0033_SequenceNumber_LockedBy ON NewTasks_0033(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0034_SequenceNumber_LockedBy ON NewTasks_0034(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0035_SequenceNumber_LockedBy ON NewTasks_0035(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0036_SequenceNumber_LockedBy ON NewTasks_0036(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0037_SequenceNumber_LockedBy ON NewTasks_0037(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0038_SequenceNumber_LockedBy ON NewTasks_0038(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0039_SequenceNumber_LockedBy ON NewTasks_0039(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0040_SequenceNumber_LockedBy ON NewTasks_0040(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0041_SequenceNumber_LockedBy ON NewTasks_0041(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0042_SequenceNumber_LockedBy ON NewTasks_0042(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0043_SequenceNumber_LockedBy ON NewTasks_0043(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0044_SequenceNumber_LockedBy ON NewTasks_0044(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0045_SequenceNumber_LockedBy ON NewTasks_0045(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0046_SequenceNumber_LockedBy ON NewTasks_0046(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0047_SequenceNumber_LockedBy ON NewTasks_0047(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0048_SequenceNumber_LockedBy ON NewTasks_0048(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0049_SequenceNumber_LockedBy ON NewTasks_0049(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0050_SequenceNumber_LockedBy ON NewTasks_0050(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0051_SequenceNumber_LockedBy ON NewTasks_0051(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0052_SequenceNumber_LockedBy ON NewTasks_0052(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0053_SequenceNumber_LockedBy ON NewTasks_0053(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0054_SequenceNumber_LockedBy ON NewTasks_0054(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0055_SequenceNumber_LockedBy ON NewTasks_0055(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0056_SequenceNumber_LockedBy ON NewTasks_0056(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0057_SequenceNumber_LockedBy ON NewTasks_0057(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0058_SequenceNumber_LockedBy ON NewTasks_0058(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0059_SequenceNumber_LockedBy ON NewTasks_0059(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0060_SequenceNumber_LockedBy ON NewTasks_0060(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0061_SequenceNumber_LockedBy ON NewTasks_0061(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0062_SequenceNumber_LockedBy ON NewTasks_0062(SequenceNumber, LockedBy);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0063_SequenceNumber_LockedBy ON NewTasks_0063(SequenceNumber, LockedBy);
 
 
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0032_InstanceID ON NewTasks_0032(InstanceID);
