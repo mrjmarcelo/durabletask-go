@@ -142,6 +142,25 @@ func (p *orchestratorProcessor) AbandonWorkItem(ctx context.Context, wi WorkItem
 	return p.be.AbandonOrchestrationWorkItem(ctx, owi)
 }
 
+// FetchWorkItems implements batch fetching for orchestrations
+func (p *orchestratorProcessor) FetchWorkItems(ctx context.Context, batchSize int) ([]WorkItem, error) {
+	if batchBackend, ok := p.be.(interface {
+		GetOrchestrationWorkItems(ctx context.Context, batchSize int) ([]*OrchestrationWorkItem, error)
+	}); ok {
+		items, err := batchBackend.GetOrchestrationWorkItems(ctx, batchSize)
+		if err != nil {
+			return nil, err
+		}
+		workItems := make([]WorkItem, len(items))
+		for i, item := range items {
+			workItems[i] = item
+		}
+		return workItems, nil
+	}
+	// Fallback: fetch single items
+	return nil, ErrNoWorkItems
+}
+
 func (w *orchestratorProcessor) applyWorkItem(ctx context.Context, wi *OrchestrationWorkItem) (context.Context, trace.Span, bool) {
 	// Ignore work items for orchestrations that are completed or are in a corrupted state.
 	switch {

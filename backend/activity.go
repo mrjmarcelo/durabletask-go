@@ -100,3 +100,22 @@ func (ap *activityProcessor) AbandonWorkItem(ctx context.Context, wi WorkItem) e
 	awi := wi.(*ActivityWorkItem)
 	return ap.be.AbandonActivityWorkItem(ctx, awi)
 }
+
+// FetchWorkItems implements batch fetching for activities
+func (ap *activityProcessor) FetchWorkItems(ctx context.Context, batchSize int) ([]WorkItem, error) {
+	if batchBackend, ok := ap.be.(interface {
+		GetActivityWorkItems(ctx context.Context, batchSize int) ([]*ActivityWorkItem, error)
+	}); ok {
+		items, err := batchBackend.GetActivityWorkItems(ctx, batchSize)
+		if err != nil {
+			return nil, err
+		}
+		workItems := make([]WorkItem, len(items))
+		for i, item := range items {
+			workItems[i] = item
+		}
+		return workItems, nil
+	}
+	// Fallback: fetch single items
+	return nil, ErrNoWorkItems
+}

@@ -53,11 +53,13 @@ type NewTaskWorkerOptions func(*WorkerOptions)
 
 type WorkerOptions struct {
 	MaxParallelWorkItems int32
+	BatchSize           int
 }
 
 func NewWorkerOptions() *WorkerOptions {
 	return &WorkerOptions{
 		MaxParallelWorkItems: 1,
+		BatchSize:           1,
 	}
 }
 
@@ -67,8 +69,14 @@ func WithMaxParallelism(n int32) NewTaskWorkerOptions {
 	}
 }
 
+func WithBatchSize(n int) NewTaskWorkerOptions {
+	return func(o *WorkerOptions) {
+		o.BatchSize = n
+	}
+}
+
 func NewTaskWorker(p TaskProcessor, logger Logger, opts ...NewTaskWorkerOptions) TaskWorker {
-	options := &WorkerOptions{MaxParallelWorkItems: 1}
+	options := &WorkerOptions{MaxParallelWorkItems: 1, BatchSize: 1}
 	for _, configure := range opts {
 		configure(options)
 	}
@@ -154,6 +162,47 @@ func (w *worker) Start(ctx context.Context) {
 }
 
 func (w *worker) ProcessNext(ctx context.Context) (bool, error) {
+	// Try batch fetch if batch size > 1
+	if w.options.BatchSize > 1 {
+		if batchProcessor, ok := w.processor.(interface {
+			FetchWorkItems(ctx context.Context, batchSize int) ([]WorkItem, error)
+		}); ok {
+			// Acquire semaphore slots for batch
+			acquired := 0
+			for acquired < w.options.BatchSize {
+				if !w.dispatchSemaphore.TryAcquire(1) {
+					break
+				}
+				acquired++
+			}
+
+			if acquired > 0 {
+				w.pending.Add(acquired)
+
+				workItems, err := batchProcessor.FetchWorkItems(ctx, acquired)
+				if err != nil || len(workItems) == 0 {
+					// Release unused semaphore slots
+					w.dispatchSemaphore.Release(acquired)
+					w.pending.Add(-acquired)
+
+					if !errors.Is(err, ErrNoWorkItems) && err != nil {
+						w.pending.Done()
+						w.dispatchSemaphore.Release(1)
+						return false, err
+					}
+					// Fall through to single-item fetch
+				} else {
+					// Process batch immediately
+					for _, wi := range workItems {
+						go w.processWorkItem(ctx, wi)
+					}
+					return true, nil
+				}
+			}
+		}
+	}
+
+	// Original single-item logic
 	if !w.dispatchSemaphore.TryAcquire(1) {
 		w.logger.Debugf("%v: waiting for one of %v in-flight execution(s) to complete", w.Name(), w.dispatchSemaphore.GetCount())
 		if err := w.dispatchSemaphore.Acquire(ctx, 1); err != nil {

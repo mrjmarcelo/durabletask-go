@@ -29,6 +29,7 @@ type PostgresOptions struct {
 	PgOptions                *pgxpool.Config
 	OrchestrationLockTimeout time.Duration
 	ActivityLockTimeout      time.Duration
+	BatchSize                int
 }
 
 type postgresBackend struct {
@@ -36,6 +37,13 @@ type postgresBackend struct {
 	workerName string
 	logger     backend.Logger
 	options    *PostgresOptions
+}
+
+// batchBackend is an internal interface for backends that support batch fetching
+type batchBackend interface {
+	backend.Backend
+	GetOrchestrationWorkItems(ctx context.Context, batchSize int) ([]*backend.OrchestrationWorkItem, error)
+	GetActivityWorkItems(ctx context.Context, batchSize int) ([]*backend.ActivityWorkItem, error)
 }
 
 // NewPostgresOptions creates a new options object for the postgres backend provider.
@@ -53,6 +61,7 @@ func NewPostgresOptions(host string, port uint16, database string, user string, 
 		PgOptions:                conf,
 		OrchestrationLockTimeout: 2 * time.Minute,
 		ActivityLockTimeout:      2 * time.Minute,
+		BatchSize:                1,
 	}
 }
 
@@ -879,6 +888,131 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	return wi, nil
 }
 
+// GetOrchestrationWorkItems fetches multiple orchestration work items in a single transaction
+func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchSize int) ([]*backend.OrchestrationWorkItem, error) {
+	if batchSize <= 0 {
+		batchSize = be.options.BatchSize
+	}
+
+	if err := be.ensureDB(); err != nil {
+		return nil, err
+	}
+
+	tx, err := be.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	now := time.Now().UTC()
+	newLockExpiration := now.Add(be.options.OrchestrationLockTimeout)
+
+	// Fetch multiple instance IDs in a single query
+	rows, err := tx.Query(
+		ctx,
+		`UPDATE Instances SET LockedBy = $1, LockExpiration = $2
+		WHERE SequenceNumber IN (
+			SELECT SequenceNumber FROM Instances I
+			WHERE (I.LockExpiration IS NULL OR I.LockExpiration < $3) AND EXISTS (
+				SELECT 1 FROM NewEvents E
+				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
+			)
+			ORDER BY I.SequenceNumber ASC
+			LIMIT $5
+			FOR UPDATE SKIP LOCKED
+		) RETURNING InstanceID`,
+		be.workerName,
+		newLockExpiration,
+		now,
+		now,
+		batchSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query for orchestration work-items: %w", err)
+	}
+	defer rows.Close()
+
+	var instanceIDs []string
+	for rows.Next() {
+		var instanceID string
+		if err := rows.Scan(&instanceID); err != nil {
+			return nil, fmt.Errorf("failed to scan instance ID: %w", err)
+		}
+		instanceIDs = append(instanceIDs, instanceID)
+	}
+	rows.Close()
+
+	if len(instanceIDs) == 0 {
+		return nil, backend.ErrNoWorkItems
+	}
+
+	// Fetch events for all instances
+	workItems := make([]*backend.OrchestrationWorkItem, 0, len(instanceIDs))
+	for _, instanceID := range instanceIDs {
+		events, err := tx.Query(
+			ctx,
+			`UPDATE NewEvents SET DequeueCount = DequeueCount + 1, LockedBy = $1 
+			WHERE SequenceNumber IN (
+				SELECT SequenceNumber FROM NewEvents
+				WHERE InstanceID = $2 AND (VisibleTime IS NULL OR VisibleTime <= $3)
+				LIMIT 1000
+			)
+			RETURNING EventPayload, DequeueCount`,
+			be.workerName,
+			instanceID,
+			now,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query events for instance %s: %w", instanceID, err)
+		}
+
+		type rawEvent struct {
+			payload []byte
+			dequeue int32
+		}
+		rawEvents := []rawEvent{}
+		for events.Next() {
+			var eventPayload []byte
+			var dequeueCount int32
+			if err := events.Scan(&eventPayload, &dequeueCount); err != nil {
+				return nil, fmt.Errorf("failed to read history event: %w", err)
+			}
+			rawEvents = append(rawEvents, rawEvent{
+				payload: eventPayload,
+				dequeue: dequeueCount,
+			})
+		}
+		events.Close()
+
+		maxDequeueCount := int32(0)
+		newEvents := make([]*protos.HistoryEvent, 0, len(rawEvents))
+		for _, e := range rawEvents {
+			if e.dequeue > maxDequeueCount {
+				maxDequeueCount = e.dequeue
+			}
+			evt, err := backend.UnmarshalHistoryEvent(e.payload)
+			if err != nil {
+				return nil, err
+			}
+			newEvents = append(newEvents, evt)
+		}
+
+		wi := &backend.OrchestrationWorkItem{
+			InstanceID: api.InstanceID(instanceID),
+			NewEvents:  newEvents,
+			LockedBy:   be.workerName,
+			RetryCount: maxDequeueCount - 1,
+		}
+		workItems = append(workItems, wi)
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return workItems, nil
+}
+
 func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.ActivityWorkItem, error) {
 	if err := be.ensureDB(); err != nil {
 		return nil, err
@@ -927,6 +1061,80 @@ func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.Ac
 		LockedBy:       be.workerName,
 	}
 	return wi, nil
+}
+
+// GetActivityWorkItems fetches multiple activity work items in a single transaction
+func (be *postgresBackend) GetActivityWorkItems(ctx context.Context, batchSize int) ([]*backend.ActivityWorkItem, error) {
+	if batchSize <= 0 {
+		batchSize = be.options.BatchSize
+	}
+
+	if err := be.ensureDB(); err != nil {
+		return nil, err
+	}
+
+	tx, err := be.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after commit is a no-op
+
+	now := time.Now().UTC()
+	newLockExpiration := now.Add(be.options.ActivityLockTimeout)
+
+	rows, err := tx.Query(
+		ctx,
+		`UPDATE NewTasks SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1
+		WHERE SequenceNumber IN (
+			SELECT SequenceNumber FROM NewTasks T
+			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
+			ORDER BY T.InstanceID, T.SequenceNumber ASC
+			LIMIT $4
+			FOR UPDATE SKIP LOCKED
+		) RETURNING SequenceNumber, InstanceID, EventPayload`,
+		be.workerName,
+		newLockExpiration,
+		now,
+		batchSize,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query for activity work-items: %w", err)
+	}
+	defer rows.Close()
+
+	workItems := []*backend.ActivityWorkItem{}
+	for rows.Next() {
+		var sequenceNumber int64
+		var instanceID string
+		var eventPayload []byte
+
+		if err := rows.Scan(&sequenceNumber, &instanceID, &eventPayload); err != nil {
+			return nil, fmt.Errorf("failed to scan activity work-item: %w", err)
+		}
+
+		e, err := backend.UnmarshalHistoryEvent(eventPayload)
+		if err != nil {
+			return nil, err
+		}
+
+		wi := &backend.ActivityWorkItem{
+			SequenceNumber: sequenceNumber,
+			InstanceID:     api.InstanceID(instanceID),
+			NewEvent:       e,
+			LockedBy:       be.workerName,
+		}
+		workItems = append(workItems, wi)
+	}
+
+	if len(workItems) == 0 {
+		return nil, backend.ErrNoWorkItems
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return workItems, nil
 }
 
 func (be *postgresBackend) CompleteActivityWorkItem(ctx context.Context, wi *backend.ActivityWorkItem) error {
