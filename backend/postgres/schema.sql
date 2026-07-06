@@ -1178,7 +1178,7 @@ CREATE INDEX IF NOT EXISTS IX_NewTasks_0027_LockExp_ID_SeqNum_WHERE_LockExp_NULL
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0028_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0028(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0029_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0029(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0030_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0030(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
-CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0031(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS_NULL;
+CREATE INDEX IF NOT EXISTS IX_NewTasks_0031_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0031(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0032_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0032(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0033_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0033(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_NewTasks_0034_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON NewTasks_0034(LockExpiration, InstanceID, SequenceNumber) WHERE LockExpiration IS NULL;
