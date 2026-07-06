@@ -171,9 +171,7 @@ func (be *postgresBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi 
 	}
 
 	rowsAffected := dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected by UPDATE NewEvents statement: %w", err)
-	} else if rowsAffected == 0 {
+	if rowsAffected == 0 {
 		return backend.ErrWorkItemLockLost
 	}
 
@@ -189,9 +187,7 @@ func (be *postgresBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi 
 	}
 
 	rowsAffected = dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected by UPDATE Instances statement: %w", err)
-	} else if rowsAffected == 0 {
+	if rowsAffected == 0 {
 		return backend.ErrWorkItemLockLost
 	}
 
@@ -275,9 +271,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	}
 
 	count := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get the number of rows affected by the Instance table update: %w", err)
-	} else if count == 0 {
+	if count == 0 {
 		return fmt.Errorf("instance '%s' no longer exists or was locked by a different worker", string(wi.InstanceID))
 	}
 
@@ -416,14 +410,8 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	}
 
 	rowsAffected := dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected by delete statement: %w", err)
-	} else if rowsAffected == 0 {
+	if rowsAffected == 0 {
 		return backend.ErrWorkItemLockLost
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to delete from the NewEvents table: %w", err)
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -542,9 +530,6 @@ func insertOrIgnoreInstanceTableInternal(ctx context.Context, tx pgx.Tx, e *back
 	}
 
 	rows := res.RowsAffected()
-	if err != nil {
-		return -1, fmt.Errorf("failed to count the rows affected: %w", err)
-	}
 	return rows, nil
 }
 
@@ -623,9 +608,6 @@ func (be *postgresBackend) cleanupOrchestrationStateInternal(ctx context.Context
 		}
 
 		rowsAffected := dbResult.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("failed to get rows affected in Instances delete operation: %w", err)
-		}
 		if rowsAffected == 0 {
 			return api.ErrNotCompleted
 		}
@@ -1190,9 +1172,7 @@ func (be *postgresBackend) CompleteActivityWorkItem(ctx context.Context, wi *bac
 	}
 
 	rowsAffected := dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected by delete statement: %w", err)
-	} else if rowsAffected == 0 {
+	if rowsAffected == 0 {
 		return backend.ErrWorkItemLockLost
 	}
 
@@ -1219,9 +1199,7 @@ func (be *postgresBackend) AbandonActivityWorkItem(ctx context.Context, wi *back
 	}
 
 	rowsAffected := dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed get rows affected by update statement for abandon: %w", err)
-	} else if rowsAffected == 0 {
+	if rowsAffected == 0 {
 		return backend.ErrWorkItemLockLost
 	}
 
