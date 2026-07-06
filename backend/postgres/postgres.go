@@ -29,7 +29,7 @@ type PostgresOptions struct {
 	PgOptions                *pgxpool.Config
 	OrchestrationLockTimeout time.Duration
 	ActivityLockTimeout      time.Duration
-	BatchSize                int
+	BatchSize                int32
 }
 
 type postgresBackend struct {
@@ -37,13 +37,6 @@ type postgresBackend struct {
 	workerName string
 	logger     backend.Logger
 	options    *PostgresOptions
-}
-
-// batchBackend is an internal interface for backends that support batch fetching
-type batchBackend interface {
-	backend.Backend
-	GetOrchestrationWorkItems(ctx context.Context, batchSize int) ([]*backend.OrchestrationWorkItem, error)
-	GetActivityWorkItems(ctx context.Context, batchSize int) ([]*backend.ActivityWorkItem, error)
 }
 
 // NewPostgresOptions creates a new options object for the postgres backend provider.
@@ -61,7 +54,7 @@ func NewPostgresOptions(host string, port uint16, database string, user string, 
 		PgOptions:                conf,
 		OrchestrationLockTimeout: 2 * time.Minute,
 		ActivityLockTimeout:      2 * time.Minute,
-		BatchSize:                1,
+		BatchSize:                100,
 	}
 }
 
@@ -876,7 +869,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 }
 
 // GetOrchestrationWorkItems fetches multiple orchestration work items in a single transaction
-func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchSize int) ([]*backend.OrchestrationWorkItem, error) {
+func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchSize int32) ([]*backend.OrchestrationWorkItem, error) {
 	if batchSize <= 0 {
 		batchSize = be.options.BatchSize
 	}
@@ -1072,7 +1065,7 @@ func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.Ac
 }
 
 // GetActivityWorkItems fetches multiple activity work items in a single transaction
-func (be *postgresBackend) GetActivityWorkItems(ctx context.Context, batchSize int) ([]*backend.ActivityWorkItem, error) {
+func (be *postgresBackend) GetActivityWorkItems(ctx context.Context, batchSize int32) ([]*backend.ActivityWorkItem, error) {
 	if batchSize <= 0 {
 		batchSize = be.options.BatchSize
 	}
