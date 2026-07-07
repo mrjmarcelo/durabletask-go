@@ -53,13 +53,11 @@ type NewTaskWorkerOptions func(*WorkerOptions)
 
 type WorkerOptions struct {
 	MaxParallelWorkItems int32
-	BatchSize           int
 }
 
 func NewWorkerOptions() *WorkerOptions {
 	return &WorkerOptions{
 		MaxParallelWorkItems: 1,
-		BatchSize:           1,
 	}
 }
 
@@ -69,14 +67,8 @@ func WithMaxParallelism(n int32) NewTaskWorkerOptions {
 	}
 }
 
-func WithBatchSize(n int) NewTaskWorkerOptions {
-	return func(o *WorkerOptions) {
-		o.BatchSize = n
-	}
-}
-
 func NewTaskWorker(p TaskProcessor, logger Logger, opts ...NewTaskWorkerOptions) TaskWorker {
-	options := &WorkerOptions{MaxParallelWorkItems: 1, BatchSize: 1}
+	options := &WorkerOptions{MaxParallelWorkItems: 1}
 	for _, configure := range opts {
 		configure(options)
 	}
@@ -162,14 +154,14 @@ func (w *worker) Start(ctx context.Context) {
 }
 
 func (w *worker) ProcessNext(ctx context.Context) (bool, error) {
-	// Try batch fetch if batch size > 1
-	if w.options.BatchSize > 1 {
+	// Try batch fetch if max parallel work items > 1
+	if w.options.MaxParallelWorkItems > 1 {
 		if batchProcessor, ok := w.processor.(interface {
 			FetchWorkItems(ctx context.Context, batchSize int) ([]WorkItem, error)
 		}); ok {
 			// Acquire semaphore slots for batch
 			acquired := 0
-			for acquired < w.options.BatchSize {
+			for acquired < int(w.options.MaxParallelWorkItems) {
 				if !w.dispatchSemaphore.TryAcquire(1) {
 					break
 				}
