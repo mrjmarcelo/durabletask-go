@@ -1027,7 +1027,7 @@ func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.Ac
 			SELECT T.SequenceNumber FROM NewTasks T
 			INNER JOIN Instances I ON T.InstanceID = I.InstanceID
 			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
-			ORDER BY I.ParentInstanceID NULLS LAST, T.InstanceID, T.SequenceNumber ASC
+			ORDER BY I.ParentInstanceID NULLS LAST, I.InstanceID, T.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING SequenceNumber, InstanceID, EventPayload`,
@@ -1089,7 +1089,7 @@ func (be *postgresBackend) GetActivityWorkItems(ctx context.Context, batchSize i
 			SELECT T.SequenceNumber FROM NewTasks T
 			INNER JOIN Instances I ON T.InstanceID = I.InstanceID
 			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
-			ORDER BY I.ParentInstanceID NULLS LAST, T.InstanceID, T.SequenceNumber ASC
+			ORDER BY I.ParentInstanceID NULLS LAST, I.InstanceID, T.SequenceNumber ASC
 			LIMIT $4
 			FOR UPDATE SKIP LOCKED
 		) RETURNING SequenceNumber, InstanceID, EventPayload`,
