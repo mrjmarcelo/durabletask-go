@@ -806,7 +806,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 		`UPDATE NewEvents SET DequeueCount = DequeueCount + 1, LockedBy = $1 WHERE SequenceNumber IN (
 			SELECT SequenceNumber FROM NewEvents
 			WHERE InstanceID = $2 AND (VisibleTime IS NULL OR VisibleTime <= $3)
-			ORDER BY InstanceID, SequenceNumber ASC
+			ORDER BY SequenceNumber ASC
 			LIMIT 1000
 		)
 		RETURNING EventPayload, DequeueCount`,
