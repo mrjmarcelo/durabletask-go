@@ -36,6 +36,9 @@ CREATE INDEX IF NOT EXISTS IX_Instances_SequenceNumber ON Instances(SequenceNumb
 CREATE INDEX IF NOT EXISTS IX_Instances_CreatedTime ON Instances(CreatedTime);
 CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID ON Instances(ParentInstanceID);
 
+-- Composite index for suborchestration priority queries (ORDER BY ParentInstanceID, InstanceID, SequenceNumber)
+CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID_InstanceID_SequenceNumber ON Instances(ParentInstanceID, InstanceID, SequenceNumber);
+
 -- Performance optimization indexes
 CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_SeqNum_WHERE_LockExp_NULL ON Instances(LockExpiration, SequenceNumber)
 WHERE LockExpiration IS NULL;
