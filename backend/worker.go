@@ -95,9 +95,9 @@ func (w *worker) Start(ctx context.Context) {
 
 	go func() {
 		var b backoff.BackOff = &backoff.ExponentialBackOff{
-			InitialInterval:     50 * time.Millisecond,
-			MaxInterval:         5 * time.Second,
-			Multiplier:          1.05,
+			InitialInterval:     25 * time.Millisecond,
+			MaxInterval:         3 * time.Second,
+			Multiplier:          1.1,
 			RandomizationFactor: 0.05,
 			Stop:                backoff.Stop,
 			Clock:               backoff.SystemClock,
