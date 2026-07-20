@@ -780,7 +780,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.ParentInstanceID, I.InstanceID, I.SequenceNumber ASC
+			ORDER BY I.InstanceID, I.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
@@ -808,6 +808,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 			WHERE InstanceID = $2 AND (VisibleTime IS NULL OR VisibleTime <= $3)
 			ORDER BY SequenceNumber ASC
 			LIMIT 1000
+			FOR UPDATE SKIP LOCKED
 		)
 		RETURNING EventPayload, DequeueCount`,
 		be.workerName,
@@ -896,7 +897,7 @@ func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchS
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.ParentInstanceID, I.InstanceID, I.SequenceNumber ASC
+			ORDER BY I.InstanceID, I.SequenceNumber ASC
 			LIMIT $5
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
