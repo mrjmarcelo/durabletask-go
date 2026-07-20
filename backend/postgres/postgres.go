@@ -780,7 +780,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.SequenceNumber ASC
+			ORDER BY I.InstanceID, I.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
@@ -806,7 +806,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 		`UPDATE NewEvents SET DequeueCount = DequeueCount + 1, LockedBy = $1 WHERE SequenceNumber IN (
 			SELECT SequenceNumber FROM NewEvents
 			WHERE InstanceID = $2 AND (VisibleTime IS NULL OR VisibleTime <= $3)
-			ORDER BY SequenceNumber ASC
+			ORDER BY InstanceID, SequenceNumber ASC
 			LIMIT 1000
 			FOR UPDATE SKIP LOCKED
 		)
@@ -897,7 +897,7 @@ func (be *postgresBackend) GetOrchestrationWorkItems(ctx context.Context, batchS
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.SequenceNumber ASC
+			ORDER BY I.InstanceID, I.SequenceNumber ASC
 			LIMIT $5
 			FOR UPDATE SKIP LOCKED
 		) RETURNING InstanceID`,
@@ -1028,7 +1028,7 @@ func (be *postgresBackend) GetActivityWorkItem(ctx context.Context) (*backend.Ac
 		WHERE SequenceNumber = (
 			SELECT T.SequenceNumber FROM NewTasks T
 			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
-			ORDER BY T.SequenceNumber ASC
+			ORDER BY T.InstanceID, T.SequenceNumber ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		) RETURNING SequenceNumber, InstanceID, EventPayload`,
@@ -1089,7 +1089,7 @@ func (be *postgresBackend) GetActivityWorkItems(ctx context.Context, batchSize i
 		WHERE SequenceNumber IN (
 			SELECT T.SequenceNumber FROM NewTasks T
 			WHERE T.LockExpiration IS NULL OR T.LockExpiration < $3
-			ORDER BY T.SequenceNumber ASC
+			ORDER BY T.InstanceID, T.SequenceNumber ASC
 			LIMIT $4
 			FOR UPDATE SKIP LOCKED
 		) RETURNING SequenceNumber, InstanceID, EventPayload`,
