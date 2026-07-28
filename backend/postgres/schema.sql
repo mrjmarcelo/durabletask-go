@@ -64,6 +64,24 @@ WHERE LockExpiration IS NULL;
 CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_WHERE_IN_COMP_FAIL_TERM ON Instances(RuntimeStatus)
 WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED');
 
+-- Index for reclaiming expired locks (WHERE LockExpiration < now, e.g. crashed/restarted workers)
+-- Complements IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL, which only covers the NULL branch
+-- of the poll query's (LockExpiration IS NULL OR LockExpiration < $3) predicate.
+CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_NotNull_ID_SeqNum ON Instances(LockExpiration, InstanceID, SequenceNumber)
+WHERE LockExpiration IS NOT NULL;
+
+-- Supplementary, more selective poll index bounded to actionable instances (PENDING/RUNNING).
+-- Stays small regardless of purge cadence, unlike IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL
+-- which grows with every unpurged completed/failed/terminated instance.
+CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_Null_Status_ID_SeqNum ON Instances(LockExpiration, InstanceID, SequenceNumber)
+WHERE LockExpiration IS NULL AND RuntimeStatus IN ('PENDING', 'RUNNING');
+
+-- Covering index for GetOrchestrationMetadata reads (SELECT ... WHERE InstanceID = $1).
+-- Enables index-only scans for the common status-check case. Excludes Input/Output/FailureDetails
+-- (large/variable size) to avoid bloating the index.
+CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_Include_Metadata ON Instances(InstanceID)
+INCLUDE (Name, RuntimeStatus, CreatedTime, LastUpdatedTime, CustomStatus);
+
 -- ============================================================================
 -- History Table (with performance optimizations)
 -- ============================================================================
