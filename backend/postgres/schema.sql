@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS History (
     SequenceNumber BIGSERIAL NOT NULL,  -- Changed to BIGSERIAL for high scale
     EventPayload BYTEA NOT NULL,
 
-    PRIMARY KEY (InstanceID, SequenceNumber) INCLUDE (EventPayload)
+    PRIMARY KEY (InstanceID, SequenceNumber)
 ) PARTITION BY HASH (InstanceID);
 
 -- Note: Fillfactor and autovacuum settings must be set on individual partitions, not the parent table
