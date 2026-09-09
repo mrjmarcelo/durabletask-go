@@ -20,7 +20,10 @@ CREATE TABLE IF NOT EXISTS Instances (
     LastUpdatedTime TIMESTAMP NOT NULL DEFAULT NOW(),
     CompletedTime TIMESTAMP NULL,
     LockedBy TEXT NULL,
-    LockExpiration TIMESTAMP NULL,
+    -- '-infinity' is the "no lease held" sentinel. Using it instead of NULL keeps the poll
+    -- predicate a single range condition (LockExpiration < now) rather than an OR over
+    -- "IS NULL" and "< now", so one index can serve the filter and the ORDER BY together.
+    LockExpiration TIMESTAMP NOT NULL DEFAULT '-infinity',
     DequeueCount INTEGER NOT NULL DEFAULT 0,
     Input TEXT NULL,
     Output TEXT NULL,
@@ -28,6 +31,17 @@ CREATE TABLE IF NOT EXISTS Instances (
     FailureDetails BYTEA NULL,
     ParentInstanceID TEXT NULL
 );
+
+-- Migrate databases created before LockExpiration became NOT NULL. CREATE TABLE IF NOT EXISTS is a
+-- no-op on an existing table, so without this the column stays nullable and holds NULLs. That is
+-- silently fatal: the poll predicate is "LockExpiration < now", and NULL fails every comparison, so
+-- every unleased instance would become permanently undequeueable.
+--
+-- All three statements are no-ops on a freshly created table. Once the column is NOT NULL the
+-- planner can prove "IS NULL" matches nothing, so the UPDATE stops costing a scan.
+UPDATE Instances SET LockExpiration = '-infinity' WHERE LockExpiration IS NULL;
+ALTER TABLE Instances ALTER COLUMN LockExpiration SET DEFAULT '-infinity';
+ALTER TABLE Instances ALTER COLUMN LockExpiration SET NOT NULL;
 
 -- Fillfactor: Reduce page splits for HOT updates (standardized to 70 to match NewEvents/NewTasks)
 ALTER TABLE Instances SET (fillfactor = 70);
@@ -38,19 +52,39 @@ ALTER TABLE Instances SET (fillfactor = 70);
 ALTER TABLE Instances SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
 -- Original indexes from base schema
--- Removed IX_Instances_SequenceNumber (covered by partial index IX_Instances_SequenceNumber_WHERE_LockExpiration_IS_NULL)
--- Removed IX_Instances_CreatedTime (not used in any query patterns in postgres.go)
+-- Removed IX_Instances_SequenceNumber and IX_Instances_CreatedTime: no query filters on either
+-- column. The orchestration poll orders by SequenceNumber but always as a tiebreaker after
+-- LockExpiration, which IX_Instances_Active_LockExp_SeqNum_ID covers.
 CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID ON Instances(ParentInstanceID);
 
 -- Composite index for suborchestration priority queries (ORDER BY ParentInstanceID, InstanceID, SequenceNumber)
 CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID_InstanceID_SequenceNumber ON Instances(ParentInstanceID, InstanceID, SequenceNumber);
 
 -- Performance optimization indexes
-CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_SeqNum_WHERE_LockExp_NULL ON Instances(LockExpiration, SequenceNumber)
-WHERE LockExpiration IS NULL;
 
-CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_WHERE_RuntimeStatus_IN_PENDING_RUNNING ON Instances(RuntimeStatus)
-WHERE RuntimeStatus IN ('PENDING', 'RUNNING');
+-- LockExpiration is NOT NULL with a '-infinity' sentinel, so every index predicated on
+-- "LockExpiration IS NULL" is now empty and every one predicated on "IS NOT NULL" covers the
+-- whole table. Drop them: CREATE INDEX IF NOT EXISTS matches on name only, so deleting the
+-- CREATE statements is not enough for an already-provisioned database.
+DROP INDEX IF EXISTS IX_Instances_LockExp_SeqNum_WHERE_LockExp_NULL;
+DROP INDEX IF EXISTS IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL;
+DROP INDEX IF EXISTS IX_Instances_SequenceNumber_WHERE_LockExpiration_IS_NULL;
+DROP INDEX IF EXISTS IX_Instances_LockExp_NotNull_ID_SeqNum;
+DROP INDEX IF EXISTS IX_Instances_LockExp_Null_Status_ID_SeqNum;
+DROP INDEX IF EXISTS IX_Instances_RuntimeStatus_WHERE_RuntimeStatus_IN_PENDING_RUNNING;
+
+-- The orchestration poll:
+--   WHERE LockExpiration < $3 AND RuntimeStatus IN (<active>) AND EXISTS (...)
+--   ORDER BY LockExpiration, SequenceNumber LIMIT 1
+-- This single index serves the range filter, the sort order and the returned InstanceID, so the
+-- plan is one ordered index scan with no sort node. Restricting it to the non-terminal statuses
+-- keeps it proportional to live workload instead of to retained history.
+--
+-- The predicate MUST stay byte-identical to activeRuntimeStatusSQL in postgres.go. PostgreSQL
+-- only uses a partial index when it can prove the query's WHERE implies the index predicate, and
+-- for an IN list that proof relies on structural equality. Drift here disables the index silently.
+CREATE INDEX IF NOT EXISTS IX_Instances_Active_LockExp_SeqNum_ID ON Instances(LockExpiration, SequenceNumber, InstanceID)
+WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- Full index for ORDER BY InstanceID, SequenceNumber (supports all rows)
 CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_SequenceNumber ON Instances(InstanceID, SequenceNumber);
@@ -58,29 +92,9 @@ CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_SequenceNumber ON Instances(I
 -- Index for abandon/complete operations (WHERE InstanceID = $1 AND LockedBy = $2)
 CREATE INDEX IF NOT EXISTS IX_Instances_InstanceID_LockedBy ON Instances(InstanceID, LockedBy);
 
--- Index for locking queries with ORDER BY (LockExpiration, InstanceID, SequenceNumber)
-CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL ON Instances(LockExpiration, InstanceID, SequenceNumber)
-WHERE LockExpiration IS NULL;
-
--- Index for batch orchestration queries (ORDER BY SequenceNumber)
-CREATE INDEX IF NOT EXISTS IX_Instances_SequenceNumber_WHERE_LockExpiration_IS_NULL ON Instances(SequenceNumber)
-WHERE LockExpiration IS NULL;
-
 -- Index for purge operations (WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED'))
 CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_WHERE_IN_COMP_FAIL_TERM ON Instances(RuntimeStatus)
 WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED');
-
--- Index for reclaiming expired locks (WHERE LockExpiration < now, e.g. crashed/restarted workers)
--- Complements IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL, which only covers the NULL branch
--- of the poll query's (LockExpiration IS NULL OR LockExpiration < $3) predicate.
-CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_NotNull_ID_SeqNum ON Instances(LockExpiration, InstanceID, SequenceNumber)
-WHERE LockExpiration IS NOT NULL;
-
--- Supplementary, more selective poll index bounded to actionable instances (PENDING/RUNNING).
--- Stays small regardless of purge cadence, unlike IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL
--- which grows with every unpurged completed/failed/terminated instance.
-CREATE INDEX IF NOT EXISTS IX_Instances_LockExp_Null_Status_ID_SeqNum ON Instances(LockExpiration, InstanceID, SequenceNumber)
-WHERE LockExpiration IS NULL AND RuntimeStatus IN ('PENDING', 'RUNNING');
 
 -- Covering index for GetOrchestrationMetadata reads (SELECT ... WHERE InstanceID = $1).
 -- Enables index-only scans for the common status-check case. Excludes Input/Output/FailureDetails

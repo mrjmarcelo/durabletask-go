@@ -30,6 +30,26 @@ var emptyString string = ""
 // generated SQL well below PostgreSQL's parameter and query-size limits.
 const maxRowsPerInsert = 1000
 
+// nonTerminalRuntimeStatuses are the orchestration statuses that can still be dequeued.
+var nonTerminalRuntimeStatuses = []string{"PENDING", "RUNNING", "SUSPENDED", "CONTINUED_AS_NEW"}
+
+// nonTerminalRuntimeStatuses are the orchestration statuses that cannot be dequeued.
+var terminalRuntimeStatuses = []string{"COMPLETED", "FAILED", "TERMINATED", "CANCELED"}
+
+// isNonTerminalRuntimeStatus reports whether an instance in this status can still be dequeued.
+func isNonTerminalRuntimeStatus(status string) bool {
+	for _, s := range nonTerminalRuntimeStatuses {
+		if s == status {
+			return true
+		}
+	}
+	return false
+}
+
+func sqlStatusList(statuses []string) string {
+	return "('" + strings.Join(statuses, "', '") + "')"
+}
+
 type PostgresOptions struct {
 	PgOptions                *pgxpool.Config
 	OrchestrationLockTimeout time.Duration
@@ -158,7 +178,7 @@ func (be *postgresBackend) AbandonOrchestrationWorkItem(ctx context.Context, wi 
 	// Verify the orchestration lease is still held before touching NewEvents.
 	dbResult, err := tx.Exec(
 		ctx,
-		"UPDATE Instances SET LockedBy = NULL, LockExpiration = NULL WHERE InstanceID = $1 AND LockedBy = $2",
+		"UPDATE Instances SET LockedBy = NULL, LockExpiration = '-infinity'::timestamp WHERE InstanceID = $1 AND LockedBy = $2",
 		string(wi.InstanceID),
 		wi.LockedBy,
 	)
@@ -204,7 +224,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 			CustomStatus = COALESCE($6::text, CustomStatus),
 			RuntimeStatus = $7,
 			LastUpdatedTime = $8::timestamp,
-			LockExpiration = NULL
+			LockExpiration = '-infinity'::timestamp
 		WHERE InstanceID = $9 AND LockedBy = $10
 	`
 
@@ -284,8 +304,12 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 		return fmt.Errorf("instance '%s' no longer exists or was locked by a different worker", string(wi.InstanceID))
 	}
 
-	// Delete the exact set of inbound events acquired during dequeue.
-	if len(wi.NewEventSequenceNumbers) > 0 {
+	// Remove the inbound events that were acquired during dequeue.
+	if !isNonTerminalRuntimeStatus(runtimeStatus) {
+		if _, err := tx.Exec(ctx, "DELETE FROM NewEvents WHERE InstanceID = $1", string(wi.InstanceID)); err != nil {
+			return fmt.Errorf("failed to delete from NewEvents table: %w", err)
+		}
+	} else if len(wi.NewEventSequenceNumbers) > 0 {
 		dbResult, err := tx.Exec(
 			ctx,
 			"DELETE FROM NewEvents WHERE InstanceID = $1 AND SequenceNumber = ANY($2::bigint[])",
@@ -629,8 +653,8 @@ func (be *postgresBackend) cleanupOrchestrationStateInternal(ctx context.Context
 	}
 
 	if requireCompleted {
-		// purge orchestration in ['COMPLETED', 'FAILED', 'TERMINATED']
-		dbResult, err := tx.Exec(ctx, "DELETE FROM Instances WHERE InstanceID = $1 AND RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED')", string(id))
+		// purge orchestration in ['COMPLETED', 'FAILED', 'TERMINATED', 'CANCELED']
+		dbResult, err := tx.Exec(ctx, fmt.Sprintf("DELETE FROM Instances WHERE InstanceID = $1 AND RuntimeStatus IN %s", sqlStatusList(terminalRuntimeStatuses)), string(id))
 		if err != nil {
 			return fmt.Errorf("failed to delete from the Instances table: %w", err)
 		}
@@ -794,6 +818,26 @@ func (be *postgresBackend) GetOrchestrationRuntimeState(ctx context.Context, wi 
 
 // GetOrchestrationWorkItem implements backend.Backend
 func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backend.OrchestrationWorkItem, error) {
+	var getOrchestrationWorkItemSQL = fmt.Sprintf(`
+		WITH candidate AS (
+			SELECT I.InstanceID FROM Instances I
+			WHERE I.LockExpiration < $3
+			AND I.RuntimeStatus IN %s
+			AND EXISTS (
+				SELECT 1 FROM NewEvents E
+				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
+			)
+			ORDER BY I.LockExpiration, I.SequenceNumber ASC
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED
+		)
+
+		UPDATE Instances SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1
+		FROM candidate
+		WHERE Instances.InstanceID = candidate.InstanceID
+		RETURNING Instances.InstanceID, Instances.DequeueCount
+	`, sqlStatusList(nonTerminalRuntimeStatuses))
+
 	if err := be.ensureDB(); err != nil {
 		return nil, err
 	}
@@ -810,17 +854,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	// Place a lock on an orchestration instance that has new events that are ready to be executed.
 	row := tx.QueryRow(
 		ctx,
-		`UPDATE Instances SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1
-		WHERE SequenceNumber = (
-			SELECT SequenceNumber FROM Instances I
-			WHERE (I.LockExpiration IS NULL OR I.LockExpiration < $3) AND EXISTS (
-				SELECT 1 FROM NewEvents E
-				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
-			)
-			ORDER BY I.InstanceID, I.SequenceNumber ASC
-			LIMIT 1
-			FOR UPDATE SKIP LOCKED
-		) RETURNING InstanceID, DequeueCount`,
+		getOrchestrationWorkItemSQL,
 		be.workerName,     // LockedBy for Instances table
 		newLockExpiration, // Updated LockExpiration for Instances table
 		now,               // LockExpiration for Instances table
@@ -858,7 +892,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 
 	type rawEvent struct {
 		sequenceNumber int64
-		payload      []byte
+		payload        []byte
 	}
 
 	rawEvents := []rawEvent{}
@@ -870,7 +904,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 		}
 		rawEvents = append(rawEvents, rawEvent{
 			sequenceNumber: sequenceNumber,
-			payload:      eventPayload,
+			payload:        eventPayload,
 		})
 	}
 	events.Close()
