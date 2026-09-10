@@ -817,16 +817,15 @@ func (be *postgresBackend) GetOrchestrationRuntimeState(ctx context.Context, wi 
 func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backend.OrchestrationWorkItem, error) {
 	var getOrchestrationWorkItemSQL = fmt.Sprintf(`
 		WITH candidate AS (
-			SELECT I.InstanceID FROM Instances I
-			WHERE I.LockExpiration < $3
+			SELECT I.InstanceID
+			FROM NewEvents E
+			INNER JOIN Instances I ON I.InstanceID = E.InstanceID
+			WHERE (E.VisibleTime IS NULL OR E.VisibleTime < $4)
+			AND I.LockExpiration < $3
 			AND I.RuntimeStatus IN %s
-			AND EXISTS (
-				SELECT 1 FROM NewEvents E
-				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
-			)
-			ORDER BY I.InstanceID ASC
+			ORDER BY E.InstanceID ASC
 			LIMIT 1
-			FOR UPDATE SKIP LOCKED
+			FOR UPDATE OF I SKIP LOCKED
 		)
 
 		UPDATE Instances SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1

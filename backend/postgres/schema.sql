@@ -28,11 +28,8 @@ CREATE TABLE IF NOT EXISTS Instances (
 -- Fillfactor: Reduce page splits for HOT updates (standardized to 70 to match NewEvents/NewTasks)
 ALTER TABLE Instances SET (fillfactor = 70);
 
--- Autovacuum tuning: RuntimeStatus is the predicate of a partial index
+-- Autovacuum tuning
 ALTER TABLE Instances SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
-
-CREATE INDEX IF NOT EXISTS IX_Instances_Ready_ID ON Instances(InstanceID)
-WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- ============================================================================
 -- History Table (with partitioning and performance optimizations)
