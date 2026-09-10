@@ -10,7 +10,6 @@
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS Instances (
     SequenceNumber BIGSERIAL,  -- Changed to BIGSERIAL for high scale
-    
     InstanceID TEXT PRIMARY KEY NOT NULL,
     ExecutionID TEXT NOT NULL,
     Name TEXT NOT NULL, -- the type name of the orchestration or entity
@@ -20,10 +19,7 @@ CREATE TABLE IF NOT EXISTS Instances (
     LastUpdatedTime TIMESTAMP NOT NULL DEFAULT NOW(),
     CompletedTime TIMESTAMP NULL,
     LockedBy TEXT NULL,
-    -- '-infinity' is the "no lease held" sentinel. Using it instead of NULL keeps the poll
-    -- predicate a single range condition (LockExpiration < now) rather than an OR over
-    -- "IS NULL" and "< now", so one index can serve the filter and the ORDER BY together.
-    LockExpiration TIMESTAMP NOT NULL DEFAULT '-infinity',
+    LockExpiration TIMESTAMP NULL DEFAULT '-infinity', -- a timestamp  -> lease held until that time. '-infinity'  -> no lease held, eligible for immediate dequeue. NULL -> reached a terminal status, never dequeue again
     DequeueCount INTEGER NOT NULL DEFAULT 0,
     Input TEXT NULL,
     Output TEXT NULL,
@@ -32,16 +28,23 @@ CREATE TABLE IF NOT EXISTS Instances (
     ParentInstanceID TEXT NULL
 );
 
--- Migrate databases created before LockExpiration became NOT NULL. CREATE TABLE IF NOT EXISTS is a
--- no-op on an existing table, so without this the column stays nullable and holds NULLs. That is
--- silently fatal: the poll predicate is "LockExpiration < now", and NULL fails every comparison, so
--- every unleased instance would become permanently undequeueable.
+-- Migrate already-provisioned databases: CREATE TABLE IF NOT EXISTS is a no-op on an existing
+-- table, so the column definition above never reaches them. Both statements are no-ops on a
+-- freshly created table.
 --
--- All three statements are no-ops on a freshly created table. Once the column is NOT NULL the
--- planner can prove "IS NULL" matches nothing, so the UPDATE stops costing a scan.
-UPDATE Instances SET LockExpiration = '-infinity' WHERE LockExpiration IS NULL;
+-- DROP NOT NULL undoes the earlier revision of this schema, which forbade NULL outright. Terminal
+-- completions now write NULL, so leaving the constraint in place makes every one of them fail with
+-- a not-null violation. Rows that revision already normalised to '-infinity' keep that value; it is
+-- equivalent for terminal rows, which the poll excludes by RuntimeStatus regardless.
 ALTER TABLE Instances ALTER COLUMN LockExpiration SET DEFAULT '-infinity';
-ALTER TABLE Instances ALTER COLUMN LockExpiration SET NOT NULL;
+ALTER TABLE Instances ALTER COLUMN LockExpiration DROP NOT NULL;
+
+-- Repair databases created before '-infinity' was the "no lease held" sentinel, where NULL carried
+-- that meaning. Those NULLs are silently fatal on a live row: the poll predicate is
+-- "LockExpiration < now" and NULL fails every comparison, so the instance never runs again.
+-- Scoped to non-terminal statuses so it does not clobber the NULLs terminal completions now write.
+UPDATE Instances SET LockExpiration = '-infinity'
+WHERE LockExpiration IS NULL AND RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- Fillfactor: Reduce page splits for HOT updates (standardized to 70 to match NewEvents/NewTasks)
 ALTER TABLE Instances SET (fillfactor = 70);
@@ -62,10 +65,12 @@ CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID_InstanceID_SequenceNumb
 
 -- Performance optimization indexes
 
--- LockExpiration is NOT NULL with a '-infinity' sentinel, so every index predicated on
--- "LockExpiration IS NULL" is now empty and every one predicated on "IS NOT NULL" covers the
--- whole table. Drop them: CREATE INDEX IF NOT EXISTS matches on name only, so deleting the
--- CREATE statements is not enough for an already-provisioned database.
+-- These indexes date from when NULL meant "no lease held" and the poll had to OR over
+-- "IS NULL" and "< now". The '-infinity' sentinel replaced that with a single range condition,
+-- so nothing splits the table on IS NULL / IS NOT NULL any more. NULL now marks terminal rows,
+-- which the poll already excludes by RuntimeStatus, so indexing them buys nothing either.
+-- Drop them: CREATE INDEX IF NOT EXISTS matches on name only, so deleting the CREATE statements
+-- is not enough for an already-provisioned database.
 DROP INDEX IF EXISTS IX_Instances_LockExp_SeqNum_WHERE_LockExp_NULL;
 DROP INDEX IF EXISTS IX_Instances_LockExp_ID_SeqNum_WHERE_LockExp_NULL;
 DROP INDEX IF EXISTS IX_Instances_SequenceNumber_WHERE_LockExpiration_IS_NULL;

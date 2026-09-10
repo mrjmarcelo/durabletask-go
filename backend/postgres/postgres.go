@@ -224,8 +224,8 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 			CustomStatus = COALESCE($6::text, CustomStatus),
 			RuntimeStatus = $7,
 			LastUpdatedTime = $8::timestamp,
-			LockExpiration = '-infinity'::timestamp
-		WHERE InstanceID = $9 AND LockedBy = $10
+			LockExpiration = CASE WHEN $9::bool THEN NULL ELSE '-infinity'::timestamp END
+		WHERE InstanceID = $10 AND LockedBy = $11
 	`
 
 	if err := be.ensureDB(); err != nil {
@@ -242,6 +242,8 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 
 	// Update the Instances table with a fixed-shape statement.
 	runtimeStatus := helpers.ToRuntimeStatusString(wi.State.RuntimeStatus())
+	// A terminal instance releases its lease as NULL rather than '-infinity'.
+	isTerminal := !isNonTerminalRuntimeStatus(runtimeStatus)
 	updateArgs := []any{
 		(*time.Time)(nil), // CreatedTime
 		(*string)(nil),    // Input
@@ -251,6 +253,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 		(*string)(nil),    // CustomStatus
 		runtimeStatus,
 		now,
+		isTerminal,
 		string(wi.InstanceID),
 		wi.LockedBy,
 	}
@@ -305,7 +308,7 @@ func (be *postgresBackend) CompleteOrchestrationWorkItem(ctx context.Context, wi
 	}
 
 	// Remove the inbound events that were acquired during dequeue.
-	if !isNonTerminalRuntimeStatus(runtimeStatus) {
+	if isTerminal {
 		if _, err := tx.Exec(ctx, "DELETE FROM NewEvents WHERE InstanceID = $1", string(wi.InstanceID)); err != nil {
 			return fmt.Errorf("failed to delete from NewEvents table: %w", err)
 		}
@@ -827,7 +830,7 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 				SELECT 1 FROM NewEvents E
 				WHERE E.InstanceID = I.InstanceID AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
 			)
-			ORDER BY I.LockExpiration, I.SequenceNumber ASC
+			ORDER BY I.InstanceID ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
 		)
