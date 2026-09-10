@@ -1,8 +1,5 @@
 -- ============================================================================
 -- Enhanced Schema for Durable Task Backend (v2)
--- Includes performance optimizations and partitioning
--- Fixed: Storage parameters now applied to individual partitions instead of parent tables
--- Updated: Increased from 8 to 32 partitions for high concurrency (160 connections)
 -- ============================================================================
 
 -- ============================================================================
@@ -31,41 +28,15 @@ CREATE TABLE IF NOT EXISTS Instances (
 -- Fillfactor: Reduce page splits for HOT updates (standardized to 70 to match NewEvents/NewTasks)
 ALTER TABLE Instances SET (fillfactor = 70);
 
--- Autovacuum tuning: LockExpiration and RuntimeStatus are indexed, so lock-claim,
--- abandon, and completion updates are not HOT-eligible and leave dead tuples + stale
--- planner stats on the exact table the poll query scans. Match NewEvents/NewTasks tuning.
+-- Autovacuum tuning: LockExpiration and RuntimeStatus are indexed
 ALTER TABLE Instances SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
--- Indexes. Every statement in postgres.go that touches Instances reaches it by InstanceID, which
--- is the PRIMARY KEY, so the PK index serves all of them: the abandon and complete UPDATEs, the
--- ON CONFLICT insert, the RuntimeStatus and existence probes, both purge DELETEs, the metadata
--- SELECT, and the poll's final UPDATE ... FROM candidate. Secondary indexes on (InstanceID, ...)
--- are duplicates of the PK, and columns filtered only alongside InstanceID (LockedBy,
--- RuntimeStatus) resolve against a single already-located row.
---
--- GetOrchestrationWorkItem's candidate CTE is the sole exception: it is the only statement that
--- reaches Instances by something other than InstanceID.
---   WHERE LockExpiration < $3 AND RuntimeStatus IN (<active>) AND EXISTS (...)
---   ORDER BY InstanceID ASC LIMIT 1 FOR UPDATE SKIP LOCKED
--- The leading LockExpiration column serves the range filter and the partial predicate keeps the
--- index proportional to live workload rather than to retained history. Note the ORDER BY is on
--- InstanceID, which this key order does not satisfy, so the plan still sorts; see if reordering
--- the key columns helps before adding anything else here.
---
--- The predicate MUST stay byte-identical to sqlStatusList(nonTerminalRuntimeStatuses) in
--- postgres.go. PostgreSQL only uses a partial index when it can prove the query's WHERE implies
--- the index predicate, and for an IN list that proof relies on structural equality. Drift here
--- disables the index silently.
 CREATE INDEX IF NOT EXISTS IX_Instances_Active_LockExp_SeqNum_ID ON Instances(LockExpiration, SequenceNumber, InstanceID)
 WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- ============================================================================
 -- History Table (with partitioning and performance optimizations)
 -- ============================================================================
--- Hash-partitioned by InstanceID: every access pattern (reads at
--- GetOrchestrationRuntimeState, inserts, and the purge/continue-as-new deletes)
--- filters WHERE InstanceID = $1, so this always prunes to exactly one partition,
--- unlike Instances/NewTasks whose hottest poll queries scan globally.
 CREATE TABLE IF NOT EXISTS History (
     InstanceID TEXT NOT NULL,
     SequenceNumber BIGSERIAL NOT NULL,  -- Changed to BIGSERIAL for high scale
@@ -74,13 +45,7 @@ CREATE TABLE IF NOT EXISTS History (
     PRIMARY KEY (InstanceID, SequenceNumber)
 ) PARTITION BY HASH (InstanceID);
 
--- Note: Fillfactor and autovacuum settings must be set on individual partitions, not the parent table
-
 -- Create 128 partitions matching NewEvents for consistency. The PRIMARY KEY (InstanceID, SequenceNumber)
--- already covers the only query pattern (ORDER BY SequenceNumber ASC WHERE InstanceID = $1), so no
--- additional per-partition indexes are needed. Fillfactor=100 (append-only, no UPDATEs) and lighter
--- autovacuum thresholds than NewEvents (dead tuples only from occasional purge/continue-as-new deletes,
--- not constant UPDATE churn).
 CREATE TABLE IF NOT EXISTS History_0000 PARTITION OF History FOR VALUES WITH (MODULUS 128, REMAINDER 0);
 ALTER TABLE History_0000 SET (fillfactor = 100);
 ALTER TABLE History_0000 SET (autovacuum_vacuum_scale_factor = 0.1, autovacuum_vacuum_threshold = 1000, autovacuum_analyze_scale_factor = 0.1, autovacuum_analyze_threshold = 1000);
@@ -730,13 +695,11 @@ CREATE TABLE IF NOT EXISTS NewEvents (
     ExecutionID TEXT NULL,
     Timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     VisibleTime TIMESTAMP NULL, -- for scheduled or abandoned messages
-    DequeueCount INTEGER NOT NULL DEFAULT 0,
-    LockedBy TEXT NULL,
+    --DequeueCount INTEGER NOT NULL DEFAULT 0,
+    --LockedBy TEXT NULL,
     EventPayload BYTEA NOT NULL,
     UNIQUE (InstanceID, SequenceNumber)
 ) PARTITION BY HASH (InstanceID);
-
--- Note: Fillfactor and autovacuum settings must be set on individual partitions, not the parent table
 
 -- Create 128 partitions for parallelism with storage parameters
 CREATE TABLE IF NOT EXISTS NewEvents_0000 PARTITION OF NewEvents FOR VALUES WITH (MODULUS 128, REMAINDER 0);
@@ -1251,17 +1214,7 @@ CREATE TABLE IF NOT EXISTS NewEvents_0127 PARTITION OF NewEvents FOR VALUES WITH
 ALTER TABLE NewEvents_0127 SET (fillfactor = 70);
 ALTER TABLE NewEvents_0127 SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
--- Per-partition indexes. The UNIQUE (InstanceID, SequenceNumber) constraint above already gives
--- every partition an index on that pair, which covers the VisibleTime UPDATE, both DELETEs, and
--- the ordered read in GetOrchestrationWorkItem. The only predicate it does not cover is the poll's
--- EXISTS probe, which filters on VisibleTime after matching InstanceID:
---   SELECT 1 FROM NewEvents E WHERE E.InstanceID = I.InstanceID
---                               AND (E.VisibleTime IS NULL OR E.VisibleTime < $4)
--- (InstanceID, VisibleTime) answers that without touching the heap.
---
--- Nothing else here is justified: no statement in postgres.go reads, writes or filters
--- NewEvents.LockedBy or NewEvents.DequeueCount, and none filters VisibleTime without also
--- constraining InstanceID.
+-- Per-partition indexes.
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0000_ID_VisTime ON NewEvents_0000(InstanceID, VisibleTime);
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0001_ID_VisTime ON NewEvents_0001(InstanceID, VisibleTime);
 CREATE INDEX IF NOT EXISTS IX_NewEvents_0002_ID_VisTime ON NewEvents_0002(InstanceID, VisibleTime);
@@ -1394,12 +1347,6 @@ CREATE INDEX IF NOT EXISTS IX_NewEvents_0127_ID_VisTime ON NewEvents_0127(Instan
 -- ============================================================================
 -- NewTasks Table (single table, no partitioning)
 -- ============================================================================
--- NOTE: Unlike NewEvents/History, NewTasks is intentionally NOT hash-partitioned by
--- InstanceID. Its hottest query patterns (poll, complete, abandon) do not filter by
--- InstanceID at all, so hash partitioning on InstanceID cannot prune and instead forces
--- every poll/complete/abandon call to fan out across all partitions. Only INSERT and the
--- per-instance purge DELETE benefit from InstanceID-based partitioning, so a single table
--- with targeted indexes performs better overall.
 CREATE TABLE IF NOT EXISTS NewTasks (
     SequenceNumber BIGSERIAL PRIMARY KEY,
     InstanceID TEXT NOT NULL,
@@ -1414,25 +1361,10 @@ CREATE TABLE IF NOT EXISTS NewTasks (
 ALTER TABLE NewTasks SET (fillfactor = 70);
 ALTER TABLE NewTasks SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
--- Poll query coverage: WHERE (LockExpiration IS NULL OR LockExpiration < $3) ORDER BY InstanceID, SequenceNumber
 CREATE INDEX IF NOT EXISTS IX_NewTasks_LockExp_Null_ID_SeqNum ON NewTasks(LockExpiration, InstanceID, SequenceNumber)
 WHERE LockExpiration IS NULL;
 
 CREATE INDEX IF NOT EXISTS IX_NewTasks_LockExp_NotNull_ID_SeqNum ON NewTasks(LockExpiration, InstanceID, SequenceNumber)
 WHERE LockExpiration IS NOT NULL;
 
--- Cleanup path: WHERE InstanceID = $1
 CREATE INDEX IF NOT EXISTS IX_NewTasks_InstanceID ON NewTasks(InstanceID);
-
-
--- ============================================================================
--- Summary of Performance Improvements
--- ============================================================================
--- 1. BIGSERIAL instead of SERIAL - Prevents sequence exhaustion at high scale
--- 2. Hash partitioning for NewEvents (128 partitions) - Better parallelism and reduced contention
--- 3. Partial indexes - 80-90% size reduction for active rows only
--- 4. Fillfactor settings - Reduces page splits for HOT updates (applied to partitions)
--- 5. Autovacuum tuning - Aggressive cleanup for high-churn tables (applied to partitions)
--- 6. Composite indexes - Optimized for complex locking query patterns
--- ============================================================================
--- ============================================================================
