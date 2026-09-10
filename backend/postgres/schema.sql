@@ -15,9 +15,9 @@ CREATE TABLE IF NOT EXISTS Instances (
     CreatedTime TIMESTAMP NOT NULL DEFAULT NOW(),
     LastUpdatedTime TIMESTAMP NOT NULL DEFAULT NOW(),
     CompletedTime TIMESTAMP NULL,
+    DequeueCount INTEGER NOT NULL DEFAULT 0,
     LockedBy TEXT NULL,
     LockExpiration TIMESTAMP NULL DEFAULT '-infinity', -- a timestamp  -> lease held until that time. '-infinity'  -> no lease held, eligible for immediate dequeue. NULL -> reached a terminal status, never dequeue again
-    DequeueCount INTEGER NOT NULL DEFAULT 0,
     Input TEXT NULL,
     Output TEXT NULL,
     CustomStatus TEXT NULL,
@@ -28,10 +28,10 @@ CREATE TABLE IF NOT EXISTS Instances (
 -- Fillfactor: Reduce page splits for HOT updates (standardized to 70 to match NewEvents/NewTasks)
 ALTER TABLE Instances SET (fillfactor = 70);
 
--- Autovacuum tuning: LockExpiration and RuntimeStatus are indexed
+-- Autovacuum tuning: RuntimeStatus is the predicate of a partial index
 ALTER TABLE Instances SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
-CREATE INDEX IF NOT EXISTS IX_Instances_Active_LockExp_SeqNum_ID ON Instances(LockExpiration, SequenceNumber, InstanceID)
+CREATE INDEX IF NOT EXISTS IX_Instances_Ready_ID ON Instances(InstanceID)
 WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- ============================================================================
@@ -695,8 +695,6 @@ CREATE TABLE IF NOT EXISTS NewEvents (
     ExecutionID TEXT NULL,
     Timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
     VisibleTime TIMESTAMP NULL, -- for scheduled or abandoned messages
-    --DequeueCount INTEGER NOT NULL DEFAULT 0,
-    --LockedBy TEXT NULL,
     EventPayload BYTEA NOT NULL,
     UNIQUE (InstanceID, SequenceNumber)
 ) PARTITION BY HASH (InstanceID);
@@ -1214,136 +1212,6 @@ CREATE TABLE IF NOT EXISTS NewEvents_0127 PARTITION OF NewEvents FOR VALUES WITH
 ALTER TABLE NewEvents_0127 SET (fillfactor = 70);
 ALTER TABLE NewEvents_0127 SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
--- Per-partition indexes.
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0000_ID_VisTime ON NewEvents_0000(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0001_ID_VisTime ON NewEvents_0001(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0002_ID_VisTime ON NewEvents_0002(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0003_ID_VisTime ON NewEvents_0003(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0004_ID_VisTime ON NewEvents_0004(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0005_ID_VisTime ON NewEvents_0005(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0006_ID_VisTime ON NewEvents_0006(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0007_ID_VisTime ON NewEvents_0007(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0008_ID_VisTime ON NewEvents_0008(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0009_ID_VisTime ON NewEvents_0009(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0010_ID_VisTime ON NewEvents_0010(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0011_ID_VisTime ON NewEvents_0011(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0012_ID_VisTime ON NewEvents_0012(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0013_ID_VisTime ON NewEvents_0013(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0014_ID_VisTime ON NewEvents_0014(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0015_ID_VisTime ON NewEvents_0015(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0016_ID_VisTime ON NewEvents_0016(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0017_ID_VisTime ON NewEvents_0017(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0018_ID_VisTime ON NewEvents_0018(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0019_ID_VisTime ON NewEvents_0019(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0020_ID_VisTime ON NewEvents_0020(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0021_ID_VisTime ON NewEvents_0021(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0022_ID_VisTime ON NewEvents_0022(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0023_ID_VisTime ON NewEvents_0023(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0024_ID_VisTime ON NewEvents_0024(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0025_ID_VisTime ON NewEvents_0025(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0026_ID_VisTime ON NewEvents_0026(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0027_ID_VisTime ON NewEvents_0027(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0028_ID_VisTime ON NewEvents_0028(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0029_ID_VisTime ON NewEvents_0029(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0030_ID_VisTime ON NewEvents_0030(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0031_ID_VisTime ON NewEvents_0031(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0032_ID_VisTime ON NewEvents_0032(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0033_ID_VisTime ON NewEvents_0033(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0034_ID_VisTime ON NewEvents_0034(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0035_ID_VisTime ON NewEvents_0035(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0036_ID_VisTime ON NewEvents_0036(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0037_ID_VisTime ON NewEvents_0037(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0038_ID_VisTime ON NewEvents_0038(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0039_ID_VisTime ON NewEvents_0039(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0040_ID_VisTime ON NewEvents_0040(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0041_ID_VisTime ON NewEvents_0041(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0042_ID_VisTime ON NewEvents_0042(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0043_ID_VisTime ON NewEvents_0043(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0044_ID_VisTime ON NewEvents_0044(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0045_ID_VisTime ON NewEvents_0045(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0046_ID_VisTime ON NewEvents_0046(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0047_ID_VisTime ON NewEvents_0047(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0048_ID_VisTime ON NewEvents_0048(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0049_ID_VisTime ON NewEvents_0049(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0050_ID_VisTime ON NewEvents_0050(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0051_ID_VisTime ON NewEvents_0051(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0052_ID_VisTime ON NewEvents_0052(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0053_ID_VisTime ON NewEvents_0053(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0054_ID_VisTime ON NewEvents_0054(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0055_ID_VisTime ON NewEvents_0055(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0056_ID_VisTime ON NewEvents_0056(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0057_ID_VisTime ON NewEvents_0057(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0058_ID_VisTime ON NewEvents_0058(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0059_ID_VisTime ON NewEvents_0059(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0060_ID_VisTime ON NewEvents_0060(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0061_ID_VisTime ON NewEvents_0061(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0062_ID_VisTime ON NewEvents_0062(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0063_ID_VisTime ON NewEvents_0063(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0064_ID_VisTime ON NewEvents_0064(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0065_ID_VisTime ON NewEvents_0065(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0066_ID_VisTime ON NewEvents_0066(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0067_ID_VisTime ON NewEvents_0067(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0068_ID_VisTime ON NewEvents_0068(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0069_ID_VisTime ON NewEvents_0069(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0070_ID_VisTime ON NewEvents_0070(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0071_ID_VisTime ON NewEvents_0071(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0072_ID_VisTime ON NewEvents_0072(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0073_ID_VisTime ON NewEvents_0073(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0074_ID_VisTime ON NewEvents_0074(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0075_ID_VisTime ON NewEvents_0075(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0076_ID_VisTime ON NewEvents_0076(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0077_ID_VisTime ON NewEvents_0077(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0078_ID_VisTime ON NewEvents_0078(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0079_ID_VisTime ON NewEvents_0079(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0080_ID_VisTime ON NewEvents_0080(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0081_ID_VisTime ON NewEvents_0081(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0082_ID_VisTime ON NewEvents_0082(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0083_ID_VisTime ON NewEvents_0083(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0084_ID_VisTime ON NewEvents_0084(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0085_ID_VisTime ON NewEvents_0085(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0086_ID_VisTime ON NewEvents_0086(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0087_ID_VisTime ON NewEvents_0087(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0088_ID_VisTime ON NewEvents_0088(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0089_ID_VisTime ON NewEvents_0089(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0090_ID_VisTime ON NewEvents_0090(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0091_ID_VisTime ON NewEvents_0091(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0092_ID_VisTime ON NewEvents_0092(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0093_ID_VisTime ON NewEvents_0093(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0094_ID_VisTime ON NewEvents_0094(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0095_ID_VisTime ON NewEvents_0095(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0096_ID_VisTime ON NewEvents_0096(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0097_ID_VisTime ON NewEvents_0097(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0098_ID_VisTime ON NewEvents_0098(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0099_ID_VisTime ON NewEvents_0099(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0100_ID_VisTime ON NewEvents_0100(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0101_ID_VisTime ON NewEvents_0101(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0102_ID_VisTime ON NewEvents_0102(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0103_ID_VisTime ON NewEvents_0103(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0104_ID_VisTime ON NewEvents_0104(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0105_ID_VisTime ON NewEvents_0105(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0106_ID_VisTime ON NewEvents_0106(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0107_ID_VisTime ON NewEvents_0107(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0108_ID_VisTime ON NewEvents_0108(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0109_ID_VisTime ON NewEvents_0109(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0110_ID_VisTime ON NewEvents_0110(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0111_ID_VisTime ON NewEvents_0111(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0112_ID_VisTime ON NewEvents_0112(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0113_ID_VisTime ON NewEvents_0113(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0114_ID_VisTime ON NewEvents_0114(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0115_ID_VisTime ON NewEvents_0115(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0116_ID_VisTime ON NewEvents_0116(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0117_ID_VisTime ON NewEvents_0117(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0118_ID_VisTime ON NewEvents_0118(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0119_ID_VisTime ON NewEvents_0119(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0120_ID_VisTime ON NewEvents_0120(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0121_ID_VisTime ON NewEvents_0121(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0122_ID_VisTime ON NewEvents_0122(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0123_ID_VisTime ON NewEvents_0123(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0124_ID_VisTime ON NewEvents_0124(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0125_ID_VisTime ON NewEvents_0125(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0126_ID_VisTime ON NewEvents_0126(InstanceID, VisibleTime);
-CREATE INDEX IF NOT EXISTS IX_NewEvents_0127_ID_VisTime ON NewEvents_0127(InstanceID, VisibleTime);
-
 -- ============================================================================
 -- NewTasks Table (single table, no partitioning)
 -- ============================================================================
@@ -1361,10 +1229,4 @@ CREATE TABLE IF NOT EXISTS NewTasks (
 ALTER TABLE NewTasks SET (fillfactor = 70);
 ALTER TABLE NewTasks SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 5000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 2000);
 
-CREATE INDEX IF NOT EXISTS IX_NewTasks_LockExp_Null_ID_SeqNum ON NewTasks(LockExpiration, InstanceID, SequenceNumber)
-WHERE LockExpiration IS NULL;
-
-CREATE INDEX IF NOT EXISTS IX_NewTasks_LockExp_NotNull_ID_SeqNum ON NewTasks(LockExpiration, InstanceID, SequenceNumber)
-WHERE LockExpiration IS NOT NULL;
-
-CREATE INDEX IF NOT EXISTS IX_NewTasks_InstanceID ON NewTasks(InstanceID);
+CREATE INDEX IF NOT EXISTS IX_NewTasks_ID_SeqNum ON NewTasks(InstanceID, SequenceNumber);
