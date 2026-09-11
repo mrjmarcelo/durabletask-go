@@ -3,7 +3,7 @@ package task
 import (
 	"fmt"
 
-	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask/internal/helpers"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/helpers"
 )
 
 // TaskRegistry contains maps of names to corresponding orchestrator and activity functions.
