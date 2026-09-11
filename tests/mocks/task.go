@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	backend "gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask/backend"
+	backend "gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/backend"
 )
 
 var _ backend.TaskProcessor = &TestTaskProcessor{}

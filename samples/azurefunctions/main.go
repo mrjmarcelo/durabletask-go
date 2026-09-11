@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"os"
 
-	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask/task"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/task"
 )
 
 // HelloCities is an orchestrator function that generates a "hello" message for several cities.

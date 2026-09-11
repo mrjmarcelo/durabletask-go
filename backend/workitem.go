@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask/api"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/api"
 )
 
 var ErrNoWorkItems = errors.New("no work items were found")

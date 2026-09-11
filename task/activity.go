@@ -6,7 +6,7 @@ import (
 	"math"
 	"time"
 
-	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask/internal/protos"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/protos"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
