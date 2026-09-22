@@ -35,7 +35,7 @@ sast-scan:
 validate-conventional-commit:
   extends: .validate-conventional-commit
 
-create_toolkit_version:
+create_durabletask_version:
   extends: .create-durabletask-version
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /DEV/'
