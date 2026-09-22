@@ -1737,3 +1737,4 @@ trigger-REL-PERF-wostatusupdateservice:
     - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
       when: manual
       allow_failure: true
+      
