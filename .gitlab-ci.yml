@@ -10,7 +10,7 @@ include:
   file: job-templates/security-jobs.yml
 - project: globalops/BPM/Logistics/DragonFx-DAO/GOLF_Maverick/GoServices/infra-k8s
   ref: v1.0.0
-  file: job-templates/toolkit-versioning.yml
+  file: job-templates/versioning.yml
 
 sca-scan:
   extends: .sca-scan-job
