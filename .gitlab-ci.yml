@@ -1,0 +1,1739 @@
+include:
+- project: globalops/BPM/Logistics/DragonFx-DAO/GOLF_Maverick/GoServices/infra-k8s
+  ref: v1.0.0
+  file: job-templates/cicd-stages.yml
+- project: devops/cicd-constructs
+  ref: v3.0.0
+  file: cicd-constructs.yml
+- project: globalops/BPM/Logistics/DragonFx-DAO/GOLF_Maverick/GoServices/infra-k8s
+  ref: v1.0.0
+  file: job-templates/security-jobs.yml
+- project: globalops/BPM/Logistics/DragonFx-DAO/GOLF_Maverick/GoServices/infra-k8s
+  ref: v1.0.0
+  file: job-templates/toolkit-versioning.yml
+
+sca-scan:
+  extends: .sca-scan-job
+  allow_failure: true
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  - if: '$CI_COMMIT_BRANCH =~ /DEV/'
+  - if: '$CI_COMMIT_BRANCH =~ /REL_PERF/'
+  - if: '$CI_COMMIT_BRANCH =~ /REL/'
+  - if: '$CI_COMMIT_BRANCH == "main"'
+
+sast-scan:  
+  extends: .sast-scan-job
+  allow_failure: true
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  - if: '$CI_COMMIT_BRANCH == "DEV"'
+  - if: '$CI_COMMIT_BRANCH == "REL"'
+  - if: '$CI_COMMIT_BRANCH == "REL_PERF"'
+  - if: '$CI_COMMIT_BRANCH == "main"'
+
+validate-conventional-commit:
+  extends: .validate-conventional-commit
+
+create_toolkit_version:
+  extends: .create-durabletask-version
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /DEV/'
+    - if: '$CI_COMMIT_BRANCH =~ /REL_PERF/'
+    - if: '$CI_COMMIT_BRANCH =~ /REL/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+trigger-DEV-asnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnlistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-asnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnlistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-asnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnlistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-asnstatuslistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnstatuslistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-asnstatuslistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnstatuslistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-asnstatuslistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/asnstatuslistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-b2binboundrouterservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/b2binboundrouterservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-b2binboundrouterservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/b2binboundrouterservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-b2binboundrouterservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/b2binboundrouterservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-crossdockacknack:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockacknack
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-crossdockacknack:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockacknack
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-crossdockacknack:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockacknack
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-crossdockworkorder:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockworkorder
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-crossdockworkorder:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockworkorder
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-crossdockworkorder:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/crossdockworkorder
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-datapreparationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/datapreparationservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-emeacrossdockservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/emeacrossdockservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-emeacrossdockservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/emeacrossdockservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-emeacrossdockservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/emeacrossdockservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-filoiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/filoiclistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-filoiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/filoiclistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-filoiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/filoiclistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ibasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ibasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ibasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ibasnprocess:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnprocess
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ibasnprocess:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnprocess
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ibasnprocess:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnprocess
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ibasnreceiptacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ibasnreceiptacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ibasnreceiptacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ibasnreceiptservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ibasnreceiptservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ibasnreceiptservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnreceiptservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ibasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ibasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ibasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ibasnservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-milestoneprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/milestoneprocessingservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-milestoneprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/milestoneprocessingservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-milestoneprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/milestoneprocessingservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-mocksrequestsservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/mocksrequestsservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-nfrequestservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfrequestservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-nfrequestservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfrequestservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-nfrequestservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfrequestservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-nfresponseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfresponseservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-nfresponseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfresponseservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-nfresponseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/nfresponseservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-oiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oiclistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-oiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oiclistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-oiclistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oiclistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-oicptmlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oicptmlistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-oicptmlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oicptmlistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-oicptmlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/oicptmlistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-orchestrationsdataservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/orchestrationsdataservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-orchestrationsdataservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/orchestrationsdataservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-orchestrationsdataservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/orchestrationsdataservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ptmasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ptmasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ptmasnacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-ptmasnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnlistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-ptmasnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnlistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-ptmasnlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/ptmasnlistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-reprocessororchestrationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/reprocessororchestrationservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-reprocessororchestrationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/reprocessororchestrationservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-reprocessororchestrationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/reprocessororchestrationservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-shipmenteddeventprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmenteddeventprocessingservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-shipmenteddeventprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmenteddeventprocessingservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-shipmenteddeventprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmenteddeventprocessingservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-shipmodechangeacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangeacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-shipmodechangeacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangeacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-shipmodechangeacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangeacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-shipmodechangedeterminationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangedeterminationservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-shipmodechangedeterminationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangedeterminationservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-shipmodechangedeterminationservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/shipmodechangedeterminationservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-snacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-snacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-snacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-snlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snlistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-snlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snlistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-snlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/snlistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-spresponseprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/spresponseprocessingservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-spresponseprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/spresponseprocessingservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-spresponseprocessingservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/spresponseprocessingservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-threeplasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/threeplasnservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-threeplasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/threeplasnservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-threeplasnservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/threeplasnservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-transloadreversemanifest:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/transloadreversemanifest
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-transloadreversemanifest:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/transloadreversemanifest
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-transloadreversemanifest:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/transloadreversemanifest
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-woacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woacknackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-woacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woacknackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-woacknackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woacknackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-wocancelservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wocancelservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-wocancelservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wocancelservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-wocancelservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wocancelservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-wochangeackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeackservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-wochangeackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeackservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-wochangeackservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeackservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-wochangeservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-wochangeservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-wochangeservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wochangeservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-woreleaseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woreleaseservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-woreleaseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woreleaseservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-woreleaseservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/woreleaseservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-workorderdownloadservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderdownloadservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-workorderdownloadservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderdownloadservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-workorderdownloadservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderdownloadservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-workorderlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderlistenerservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-workorderlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderlistenerservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-workorderlistenerservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/workorderlistenerservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
+
+trigger-DEV-wostatusupdateservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wostatusupdateservice
+    branch: $BRANCH_DEV
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_DEV'
+      when: manual
+      allow_failure: true
+
+trigger-REL-wostatusupdateservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wostatusupdateservice
+    branch: $BRANCH_REL
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL'
+      when: manual
+      allow_failure: true
+
+trigger-REL-PERF-wostatusupdateservice:
+  stage: trigger
+  allow_failure: false
+  trigger:
+    project: globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/wostatusupdateservice
+    branch: $BRANCH_REL_PERF
+    strategy: depend
+  variables:
+    ARTIFACT_LANG: "default"
+    ARTIFACT_SECRET_PATH: "kv/ARTIFACTORY"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $BRANCH_REL_PERF'
+      when: manual
+      allow_failure: true
