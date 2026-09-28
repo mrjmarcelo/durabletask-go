@@ -815,24 +815,23 @@ func (be *postgresBackend) GetOrchestrationRuntimeState(ctx context.Context, wi 
 
 // GetOrchestrationWorkItem implements backend.Backend
 func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backend.OrchestrationWorkItem, error) {
-	var getOrchestrationWorkItemSQL = fmt.Sprintf(`
-		WITH candidate AS (
-			SELECT I.InstanceID
-			FROM NewEvents E
-			INNER JOIN Instances I ON I.InstanceID = E.InstanceID
-			WHERE (E.VisibleTime IS NULL OR E.VisibleTime < $4)
-			AND I.LockExpiration < $3
-			AND I.RuntimeStatus IN %s
-			ORDER BY E.InstanceID ASC
-			LIMIT 1
-			FOR UPDATE OF I SKIP LOCKED
-		)
-
-		UPDATE Instances SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1
-		FROM candidate
-		WHERE Instances.InstanceID = candidate.InstanceID
-		RETURNING Instances.InstanceID, Instances.DequeueCount
+	var selectCandidateSQL = fmt.Sprintf(`
+		SELECT I.InstanceID
+		FROM NewEvents E
+		INNER JOIN Instances I ON I.InstanceID = E.InstanceID
+		WHERE (E.VisibleTime IS NULL OR E.VisibleTime < $2)
+		AND I.LockExpiration < $1
+		AND I.RuntimeStatus IN %s
+		ORDER BY E.InstanceID ASC
+		LIMIT 1
+		FOR UPDATE OF I SKIP LOCKED
 	`, sqlStatusList(nonTerminalRuntimeStatuses))
+
+	var updateInstanceSQL = `
+		UPDATE Instances SET LockedBy = $1, LockExpiration = $2, DequeueCount = DequeueCount + 1
+		WHERE InstanceID = $3
+		RETURNING Instances.InstanceID, Instances.DequeueCount
+	`
 
 	if err := be.ensureDB(); err != nil {
 		return nil, err
@@ -847,25 +846,41 @@ func (be *postgresBackend) GetOrchestrationWorkItem(ctx context.Context) (*backe
 	now := time.Now().UTC()
 	newLockExpiration := now.Add(be.options.OrchestrationLockTimeout)
 
-	// Place a lock on an orchestration instance that has new events that are ready to be executed.
+	// First, select a candidate instance with a lock
 	row := tx.QueryRow(
 		ctx,
-		getOrchestrationWorkItemSQL,
-		be.workerName,     // LockedBy for Instances table
-		newLockExpiration, // Updated LockExpiration for Instances table
-		now,               // LockExpiration for Instances table
-		now,               // VisibleTime for NewEvents table
+		selectCandidateSQL,
+		now, // LockExpiration for Instances table
+		now, // VisibleTime for NewEvents table
 	)
 
 	var instanceID string
-	var dequeueCount int32
-	if err := row.Scan(&instanceID, &dequeueCount); err != nil {
+	if err := row.Scan(&instanceID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// No new events to process
 			return nil, backend.ErrNoWorkItems
 		}
 
 		return nil, fmt.Errorf("failed to scan the orchestration work-item: %w", err)
+	}
+
+	// Second, update the selected instance with lock information
+	row = tx.QueryRow(
+		ctx,
+		updateInstanceSQL,
+		be.workerName,     // LockedBy for Instances table
+		newLockExpiration, // Updated LockExpiration for Instances table
+		instanceID,        // InstanceID to update
+	)
+
+	var dequeueCount int32
+	if err := row.Scan(&instanceID, &dequeueCount); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Instance was locked by another worker between selection and update
+			return nil, backend.ErrNoWorkItems
+		}
+
+		return nil, fmt.Errorf("failed to update the orchestration work-item: %w", err)
 	}
 
 	// Get all the unprocessed events associated with the locked instance.
