@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/microsoft/durabletask-go/api"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/api"
 )
 
 var ErrNoWorkItems = errors.New("no work items were found")
@@ -16,13 +16,13 @@ type WorkItem interface {
 }
 
 type OrchestrationWorkItem struct {
-	InstanceID            api.InstanceID
-	NewEvents             []*HistoryEvent
+	InstanceID              api.InstanceID
+	NewEvents               []*HistoryEvent
 	NewEventSequenceNumbers []int64
-	LockedBy              string
-	RetryCount            int32
-	State                 *OrchestrationRuntimeState
-	Properties            map[string]any
+	LockedBy                string
+	RetryCount              int32
+	State                   *OrchestrationRuntimeState
+	Properties              map[string]any
 }
 
 // String implements core.WorkItem and fmt.Stringer

@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/microsoft/durabletask-go/internal/protos"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/protos"
 )
 
 var tracer = otel.Tracer("durabletask")
@@ -151,7 +151,7 @@ func SpanContextFromTraceContext(tc *protos.TraceContext) (trace.SpanContext, er
 		// backwards compatibility with older versions of the protobuf
 		traceID = tc.GetTraceParent()
 		spanID = tc.GetSpanID() //nolint:staticcheck // backwards compatibility with older versions of the protobuf
-		traceFlags = "01" // sampled
+		traceFlags = "01"       // sampled
 	}
 
 	decodedTraceID, err = trace.TraceIDFromHex(traceID)

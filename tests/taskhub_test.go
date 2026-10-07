@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/microsoft/durabletask-go/backend"
-	"github.com/microsoft/durabletask-go/tests/mocks"
 	"github.com/stretchr/testify/assert"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/backend"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/tests/mocks"
 )
 
 func Test_TaskHubWorkerStartsDependencies(t *testing.T) {

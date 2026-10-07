@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/microsoft/durabletask-go/api"
-	"github.com/microsoft/durabletask-go/backend"
-	"github.com/microsoft/durabletask-go/backend/sqlite"
-	"github.com/microsoft/durabletask-go/internal/protos"
-	"github.com/microsoft/durabletask-go/task"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/api"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/backend"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/backend/sqlite"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/protos"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/task"
 )
 
 func Test_EmptyOrchestration(t *testing.T) {
@@ -1263,7 +1263,7 @@ func Test_PurgeOrchestration_Recursive(t *testing.T) {
 }
 
 func Test_RecreateCompletedOrchestration(t *testing.T) {
-	t.Skip("Not yet supported. Needs https://github.com/microsoft/durabletask-go/issues/42")
+	t.Skip("Not yet supported. Needs https://gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/issues/42")
 
 	// Registration
 	r := task.NewTaskRegistry()

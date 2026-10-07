@@ -11,10 +11,10 @@ import (
 
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/microsoft/durabletask-go/api"
-	"github.com/microsoft/durabletask-go/backend"
-	"github.com/microsoft/durabletask-go/internal/helpers"
-	"github.com/microsoft/durabletask-go/internal/protos"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/api"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/backend"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/helpers"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/protos"
 )
 
 // Orchestrator is the functional interface for orchestrator functions.

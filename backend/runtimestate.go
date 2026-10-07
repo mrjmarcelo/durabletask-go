@@ -8,9 +8,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/microsoft/durabletask-go/api"
-	"github.com/microsoft/durabletask-go/internal/helpers"
-	"github.com/microsoft/durabletask-go/internal/protos"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/api"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/helpers"
+	"gitlab.dell.com/globalops/BPM/logistics/dragonfx-dao/golf_maverick/goservices/durabletask-go/internal/protos"
 )
 
 var ErrDuplicateEvent = errors.New("duplicate event")
@@ -179,7 +179,7 @@ func (s *OrchestrationRuntimeState) ApplyActions(actions []*protos.OrchestratorA
 			if err := s.AddEvent(scheduledEvent); err != nil {
 				return false, fmt.Errorf("failed to add task scheduled event: %w", err)
 			}
-			s.pendingTasks= append(s.pendingTasks, scheduledEvent)
+			s.pendingTasks = append(s.pendingTasks, scheduledEvent)
 		} else if createSO := action.GetCreateSubOrchestration(); createSO != nil {
 			// Autogenerate an instance ID for the sub-orchestration if none is provided, using a
 			// deterministic algorithm based on the parent instance ID to help enable de-duplication.
