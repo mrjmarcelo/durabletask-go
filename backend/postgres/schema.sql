@@ -29,8 +29,11 @@ CREATE TABLE IF NOT EXISTS Instances (
 ALTER TABLE Instances SET (fillfactor = 70);
 ALTER TABLE Instances SET (autovacuum_vacuum_scale_factor = 0.02, autovacuum_vacuum_threshold = 1000, autovacuum_analyze_scale_factor = 0.02, autovacuum_analyze_threshold = 500);
 
-CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_NonTerminal 
-ON Instances (RuntimeStatus) 
+CREATE INDEX IF NOT EXISTS IX_Instances_ParentInstanceID
+ON Instances (ParentInstanceID);
+
+CREATE INDEX IF NOT EXISTS IX_Instances_RuntimeStatus_NonTerminal
+ON Instances (RuntimeStatus)
 WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
 
 -- ============================================================================
