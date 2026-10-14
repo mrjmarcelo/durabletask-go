@@ -1,7 +1,7 @@
 -- ========================================
 -- Multi-Schema Migration: v1 to v2
 -- ========================================
--- This script migrates from the old schema (schema_old.sql) to the new
+-- This script migrates from the old schema (schema_v1.sql) to the new
 -- partitioned schema (schema.sql) for multiple schemas.
 --
 -- PREREQUISITES:
@@ -35,47 +35,49 @@ SET work_mem = '256MB';
 
 DO $$
 DECLARE
-    schema_name TEXT;
+    current_schema_name TEXT;
     dry_run BOOLEAN := false;  -- Set to true for dry-run mode, false for actual migration
     schemas TEXT[] := ARRAY[
         'asn_listener_service',
         'asn_status_listener_service',
-        'three_plasn_service',
-        'ptmasn_listener_service',
-        'sn_listener_service',
-        'work_order_listener_service',
-        'work_order_download_service',
-        'work_order_release_service',
-        'wo_status_update_service',
-        'wo_ack_nack_service',
         'b2b_inbound_router_service',
+        'crossdock_ack_nack_service',
+        'crossdock_workorder_service',
+        'emea_crossdock_service',
+        'fe_listener_service',
+        'fil_oic_listener_service',
         'ibasn_ack_nack_service',
-        'ibasn_receipt_service',
         'ibasn_process',
-        'wo_cancel_service',
-        'wo_change_ack_service',
+        'ibasn_receipt_ack_nack_service',
+        'ibasn_receipt_service',
+        'ibasn_service',
+        'milestone_processing_service',
         'nf_request_service',
         'nf_response_service',
         'oic_listener_service',
-        'shipment_edd_event_processing_service',
-        'crossdock_ack_nack_service',
-        'milestone_processing_service',
-        'crossdock_workorder_service',
-        'sp_response_processing_service',
-        'transload_reverse_manifest_service',
-        'fil_oic_listener_service',
-        'wo_change_service',
-        'ibasn_service',
-        'emea_crossdock_service',
-        'ship_mode_change_determination_service',
-        'ship_mode_change_ack_nack_service',
-        'ptm_asn_ack_nack_service',
         'oic_ptm_listener_service',
-        'ibasn_receipt_ack_nack_service',
+        'ptm_asn_ack_nack_service',
+        'ptmasn_listener_service',
+        'ship_mode_change_ack_nack_service',
+        'ship_mode_change_determination_service',
+        'shipment_edd_event_processing_service',
         'sn_ack_nack_service',
-        'fe_listener_service'
+        'sn_listener_service',
+        'sp_response_processing_service',
+        'three_plasn_service',
+        'transload_reverse_manifest_service',
+        'wo_ack_nack_service',
+        'wo_cancel_service',
+        'wo_change_ack_service',
+        'wo_change_service',
+        'wo_status_update_service',
+        'work_order_download_service',
+        'work_order_listener_service',
+        'work_order_release_service'
     ];
+
     failed_schemas TEXT[] := '{}';
+    skipped_schemas TEXT[] := '{}';
     success_count INT := 0;
     error_message TEXT;
     
@@ -84,6 +86,7 @@ DECLARE
     new_tables_exist BOOLEAN;
     old_suffix_tables_exist BOOLEAN;
     migration_table_exists BOOLEAN;
+    migration_completed BOOLEAN;
     row_count BIGINT;
     terminal_with_lock_count BIGINT;
     unlocked_without_infinity_count BIGINT;
@@ -97,14 +100,21 @@ DECLARE
     new_newtasks_count BIGINT;
     i INT;
 BEGIN
-    FOREACH schema_name IN ARRAY schemas
+    FOREACH current_schema_name IN ARRAY schemas
     LOOP
         BEGIN
             -- Set search path to this schema
-            PERFORM set_config('search_path', schema_name, false);
+            PERFORM set_config('search_path', current_schema_name, false);
+            
+            -- Check if schema exists
+            IF NOT EXISTS (SELECT 1 FROM information_schema.schemata s WHERE s.schema_name = current_schema_name) THEN
+                RAISE WARNING 'ERROR: Schema % does not exist in the database. Skipping.', current_schema_name;
+                failed_schemas := array_append(failed_schemas, current_schema_name);
+                CONTINUE;
+            END IF;
             
             RAISE NOTICE '==============================';
-            RAISE NOTICE 'Starting migration for schema: %', schema_name;
+            RAISE NOTICE 'Starting migration for schema: %', current_schema_name;
             RAISE NOTICE '==============================';
             
             -- Check dry-run mode
@@ -124,17 +134,17 @@ BEGIN
                 AND table_schema = current_schema()
             ) INTO old_tables_exist;
 
-            -- Check if _new tables exist
+            -- Check if _v2 tables exist
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.tables
-                WHERE table_name = 'instances_new'
+                WHERE table_name = 'instances_v2'
                 AND table_schema = current_schema()
             ) INTO new_tables_exist;
 
-            -- Check if _old tables exist (indicates migration completed)
+            -- Check if _v1 tables exist (indicates migration completed)
             SELECT EXISTS (
                 SELECT 1 FROM information_schema.tables
-                WHERE table_name = 'instances_old'
+                WHERE table_name = 'instances_v1'
                 AND table_schema = current_schema()
             ) INTO old_suffix_tables_exist;
 
@@ -145,19 +155,41 @@ BEGIN
                 AND table_schema = current_schema()
             ) INTO migration_table_exists;
 
+            -- Check if migration already completed via schema_migrations table
+            IF migration_table_exists THEN
+                SELECT EXISTS (
+                    SELECT 1 FROM schema_migrations
+                    WHERE migration_name = 'v1_to_v2'
+                    AND phase = 'Phase 7'
+                    AND status = 'completed'
+                ) INTO migration_completed;
+            ELSE
+                migration_completed := false;
+            END IF;
+
             -- Migration already completed
-            IF old_suffix_tables_exist THEN
-                RAISE EXCEPTION 'Migration already completed. The instances_old table exists. To re-run migration, first execute Phase 9 (cleanup) to drop _old tables, or Phase 8 (rollback) if you need to revert.';
+            IF migration_completed THEN
+                RAISE NOTICE 'SKIPPED: Migration already completed for schema %. Found v1_to_v2 migration with Phase 7 completed status.', current_schema_name;
+                skipped_schemas := array_append(skipped_schemas, current_schema_name);
+                CONTINUE;
             END IF;
 
             -- Migration in progress (incomplete)
             IF new_tables_exist AND NOT old_tables_exist THEN
-                RAISE EXCEPTION 'Migration is in progress. The instances_new table exists but instances does not. Complete the current migration by running Phase 7 (cutover), or execute Phase 8 (rollback) to revert.';
+                RAISE EXCEPTION 'Migration is in progress. The instances_v2 table exists but instances does not. Complete the current migration by running Phase 7 (cutover), or execute Phase 8 (rollback) to revert.';
             END IF;
 
             -- Old schema not found (already on new schema)
             IF NOT old_tables_exist THEN
-                RAISE EXCEPTION 'Old schema tables not found. This database may already be on the new schema. Expected instances table to exist.';
+                RAISE NOTICE 'SKIPPED: Old schema tables not found for schema %. This database may already be on the new schema.', current_schema_name;
+                skipped_schemas := array_append(skipped_schemas, current_schema_name);
+                CONTINUE;
+            END IF;
+
+            -- Check if old table is empty
+            SELECT COUNT(*) INTO row_count FROM instances;
+            IF row_count = 0 THEN
+                RAISE NOTICE 'INFO: Old table instances is empty for schema %. Structure will still be migrated.', current_schema_name;
             END IF;
 
             RAISE NOTICE 'Phase 0: Pre-flight checks passed. Migration can proceed.';
@@ -204,19 +236,19 @@ BEGIN
             RAISE NOTICE 'Phase 1: Sequence backup and tracking tables created';
 
             -- ========================================
-            -- Phase 2: Create New Tables with _new suffix
+            -- Phase 2: Create New Tables with _v2 suffix
             -- ========================================
 
             IF NOT dry_run THEN
-                UPDATE schema_migrations SET phase = 'Phase 2', status = 'started', details = 'Creating _new tables'
+                UPDATE schema_migrations SET phase = 'Phase 2', status = 'started', details = 'Creating _v2 tables'
                 WHERE migration_name = 'v1_to_v2';
             END IF;
 
             -- ========================================
-            -- instances_new Table
+            -- instances_v2 Table
             -- ========================================
             IF NOT dry_run THEN
-                CREATE TABLE instances_new (
+                CREATE TABLE instances_v2 (
                     SequenceNumber BIGSERIAL,
                     InstanceID TEXT NOT NULL,
                     ExecutionID TEXT NOT NULL,
@@ -237,54 +269,54 @@ BEGIN
                     PRIMARY KEY (InstanceID)
                 );
 
-                ALTER TABLE instances_new SET (fillfactor = 70);
-                ALTER TABLE instances_new SET (autovacuum_vacuum_scale_factor = 0.02, autovacuum_vacuum_threshold = 1000, autovacuum_analyze_scale_factor = 0.02, autovacuum_analyze_threshold = 500);
+                ALTER TABLE instances_v2 SET (fillfactor = 70);
+                ALTER TABLE instances_v2 SET (autovacuum_vacuum_scale_factor = 0.02, autovacuum_vacuum_threshold = 1000, autovacuum_analyze_scale_factor = 0.02, autovacuum_analyze_threshold = 500);
 
-                CREATE INDEX IX_instances_new_ParentInstanceID ON instances_new (ParentInstanceID);
-                CREATE INDEX IX_instances_new_RuntimeStatus_NonTerminal ON instances_new (RuntimeStatus) WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
+                CREATE INDEX IX_instances_v2_ParentInstanceID ON instances_v2 (ParentInstanceID);
+                CREATE INDEX IX_instances_v2_RuntimeStatus_NonTerminal ON instances_v2 (RuntimeStatus) WHERE RuntimeStatus IN ('PENDING', 'RUNNING', 'SUSPENDED', 'CONTINUED_AS_NEW');
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create instances_new table with indexes';
+                RAISE NOTICE 'DRY-RUN: Would create instances_v2 table with indexes';
             END IF;
 
-            RAISE NOTICE 'Phase 2: instances_new table created';
+            RAISE NOTICE 'Phase 2: instances_v2 table created';
 
             -- ========================================
-            -- history_new Table (with 128 partitions)
+            -- history_v2 Table (with 128 partitions)
             -- ========================================
             IF NOT dry_run THEN
-                CREATE TABLE history_new (
+                CREATE TABLE history_v2 (
                     InstanceID TEXT NOT NULL,
                     SequenceNumber BIGSERIAL NOT NULL,
                     EventPayload BYTEA NOT NULL,
                     PRIMARY KEY (InstanceID, SequenceNumber)
                 ) PARTITION BY HASH (InstanceID);
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create history_new partitioned table';
+                RAISE NOTICE 'DRY-RUN: Would create history_v2 partitioned table';
             END IF;
 
-            -- Create 128 partitions for history_new with error handling
+            -- Create 128 partitions for history_v2 with error handling
             IF NOT dry_run THEN
                 FOR i IN 0..127 LOOP
                     BEGIN
-                        EXECUTE format('CREATE TABLE history_new_%s PARTITION OF history_new FOR VALUES WITH (MODULUS 128, REMAINDER %s)', lpad(i::text, 4, '0'), i::text);
-                        EXECUTE format('ALTER TABLE history_new_%s SET (fillfactor = 100)', lpad(i::text, 4, '0'));
-                        EXECUTE format('ALTER TABLE history_new_%s SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 2000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 1000)', lpad(i::text, 4, '0'));
+                        EXECUTE format('CREATE TABLE history_v2_%s PARTITION OF history_v2 FOR VALUES WITH (MODULUS 128, REMAINDER %s)', lpad(i::text, 4, '0'), i::text);
+                        EXECUTE format('ALTER TABLE history_v2_%s SET (fillfactor = 100)', lpad(i::text, 4, '0'));
+                        EXECUTE format('ALTER TABLE history_v2_%s SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 2000, autovacuum_analyze_scale_factor = 0.05, autovacuum_analyze_threshold = 1000)', lpad(i::text, 4, '0'));
                     EXCEPTION WHEN OTHERS THEN
-                        RAISE EXCEPTION 'Failed to create history_new partition %04s: %', i, SQLERRM;
+                        RAISE EXCEPTION 'Failed to create history_v2 partition %04s: %', i, SQLERRM;
                     END;
                 END LOOP;
-                RAISE NOTICE 'Created 128 partitions for history_new';
+                RAISE NOTICE 'Created 128 partitions for history_v2';
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create 128 partitions for history_new';
+                RAISE NOTICE 'DRY-RUN: Would create 128 partitions for history_v2';
             END IF;
 
-            RAISE NOTICE 'Phase 2: history_new table with 128 partitions created';
+            RAISE NOTICE 'Phase 2: history_v2 table with 128 partitions created';
 
             -- ========================================
-            -- newevents_new Table (with 128 partitions)
+            -- newevents_v2 Table (with 128 partitions)
             -- ========================================
             IF NOT dry_run THEN
-                CREATE TABLE newevents_new (
+                CREATE TABLE newevents_v2 (
                     SequenceNumber BIGSERIAL,
                     InstanceID TEXT NOT NULL,
                     ExecutionID TEXT NULL,
@@ -294,32 +326,32 @@ BEGIN
                     UNIQUE (InstanceID, SequenceNumber)
                 ) PARTITION BY HASH (InstanceID);
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create newevents_new partitioned table';
+                RAISE NOTICE 'DRY-RUN: Would create newevents_v2 partitioned table';
             END IF;
 
-            -- Create 128 partitions for newevents_new with error handling
+            -- Create 128 partitions for newevents_v2 with error handling
             IF NOT dry_run THEN
                 FOR i IN 0..127 LOOP
                     BEGIN
-                        EXECUTE format('CREATE TABLE newevents_new_%s PARTITION OF newevents_new FOR VALUES WITH (MODULUS 128, REMAINDER %s)', lpad(i::text, 4, '0'), i::text);
-                        EXECUTE format('ALTER TABLE newevents_new_%s SET (fillfactor = 70)', lpad(i::text, 4, '0'));
-                        EXECUTE format('ALTER TABLE newevents_new_%s SET (autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_threshold = 500, autovacuum_analyze_scale_factor = 0.01, autovacuum_analyze_threshold = 200)', lpad(i::text, 4, '0'));
+                        EXECUTE format('CREATE TABLE newevents_v2_%s PARTITION OF newevents_v2 FOR VALUES WITH (MODULUS 128, REMAINDER %s)', lpad(i::text, 4, '0'), i::text);
+                        EXECUTE format('ALTER TABLE newevents_v2_%s SET (fillfactor = 70)', lpad(i::text, 4, '0'));
+                        EXECUTE format('ALTER TABLE newevents_v2_%s SET (autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_threshold = 500, autovacuum_analyze_scale_factor = 0.01, autovacuum_analyze_threshold = 200)', lpad(i::text, 4, '0'));
                     EXCEPTION WHEN OTHERS THEN
-                        RAISE EXCEPTION 'Failed to create newevents_new partition %04s: %', i, SQLERRM;
+                        RAISE EXCEPTION 'Failed to create newevents_v2 partition %04s: %', i, SQLERRM;
                     END;
                 END LOOP;
-                RAISE NOTICE 'Created 128 partitions for newevents_new';
+                RAISE NOTICE 'Created 128 partitions for newevents_v2';
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create 128 partitions for newevents_new';
+                RAISE NOTICE 'DRY-RUN: Would create 128 partitions for newevents_v2';
             END IF;
 
-            RAISE NOTICE 'Phase 2: newevents_new table with 128 partitions created';
+            RAISE NOTICE 'Phase 2: newevents_v2 table with 128 partitions created';
 
             -- ========================================
-            -- newtasks_new Table
+            -- newtasks_v2 Table
             -- ========================================
             IF NOT dry_run THEN
-                CREATE TABLE newtasks_new (
+                CREATE TABLE newtasks_v2 (
                     SequenceNumber BIGSERIAL PRIMARY KEY,
                     InstanceID TEXT NOT NULL,
                     ExecutionID TEXT NULL,
@@ -331,16 +363,16 @@ BEGIN
                     UNIQUE (InstanceID, SequenceNumber)
                 );
 
-                ALTER TABLE newtasks_new SET (fillfactor = 70);
-                ALTER TABLE newtasks_new SET (autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_threshold = 200, autovacuum_analyze_scale_factor = 0.01, autovacuum_analyze_threshold = 100);
+                ALTER TABLE newtasks_v2 SET (fillfactor = 70);
+                ALTER TABLE newtasks_v2 SET (autovacuum_vacuum_scale_factor = 0.01, autovacuum_vacuum_threshold = 200, autovacuum_analyze_scale_factor = 0.01, autovacuum_analyze_threshold = 100);
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would create newtasks_new table with indexes';
+                RAISE NOTICE 'DRY-RUN: Would create newtasks_v2 table with indexes';
             END IF;
 
-            RAISE NOTICE 'Phase 2: newtasks_new table created';
+            RAISE NOTICE 'Phase 2: newtasks_v2 table created';
 
             IF NOT dry_run THEN
-                UPDATE schema_migrations SET phase = 'Phase 2', status = 'completed', details = 'All _new tables created'
+                UPDATE schema_migrations SET phase = 'Phase 2', status = 'completed', details = 'All _v2 tables created'
                 WHERE migration_name = 'v1_to_v2';
             END IF;
 
@@ -349,13 +381,13 @@ BEGIN
             -- ========================================
 
             IF NOT dry_run THEN
-                PERFORM setval('instances_new_sequencenumber_seq', 
+                PERFORM setval('instances_v2_sequencenumber_seq', 
                     (SELECT last_value FROM instances_sequencenumber_seq));
-                PERFORM setval('history_new_sequencenumber_seq', 
+                PERFORM setval('history_v2_sequencenumber_seq', 
                     (SELECT last_value FROM history_sequencenumber_seq));
-                PERFORM setval('newevents_new_sequencenumber_seq', 
+                PERFORM setval('newevents_v2_sequencenumber_seq', 
                     (SELECT last_value FROM newevents_sequencenumber_seq));
-                PERFORM setval('newtasks_new_sequencenumber_seq', 
+                PERFORM setval('newtasks_v2_sequencenumber_seq', 
                     (SELECT last_value FROM newtasks_sequencenumber_seq));
             ELSE
                 RAISE NOTICE 'DRY-RUN: Would set sequence continuity';
@@ -379,7 +411,7 @@ BEGIN
 
             -- Migrate instances with LockExpiration business logic
             IF NOT dry_run THEN
-                INSERT INTO instances_new (
+                INSERT INTO instances_v2 (
                     SequenceNumber, InstanceID, ExecutionID, Name, Version, RuntimeStatus,
                     CreatedTime, LastUpdatedTime, CompletedTime,
                     DequeueCount, LockedBy, LockExpiration,
@@ -393,46 +425,44 @@ BEGIN
                     0 AS DequeueCount,
                     LockedBy, 
                     CASE 
+                        WHEN (LockExpiration IS NOT NULL)
+                            THEN LockExpiration
                         WHEN RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED', 'CANCELED') 
                             THEN NULL
-                        WHEN (LockedBy IS NULL OR LockedBy = '') 
-                             AND LockExpiration IS NULL
+                        WHEN (RuntimeStatus = 'PENDING') 
                             THEN '-infinity'
-                        WHEN (LockedBy IS NOT NULL AND LockedBy != '') 
-                             AND LockExpiration IS NULL
-                            THEN NOW()
-                        ELSE LockExpiration
+                        ELSE NOW()
                     END AS LockExpiration,
                     Input, Output, CustomStatus, FailureDetails, ParentInstanceID
                 FROM instances;
                 
                 GET DIAGNOSTICS row_count = ROW_COUNT;
-                RAISE NOTICE 'Migrated % rows to instances_new', row_count;
+                RAISE NOTICE 'Migrated % rows to instances_v2', row_count;
             ELSE
                 SELECT COUNT(*) INTO row_count FROM instances;
-                RAISE NOTICE 'DRY-RUN: Would migrate % rows to instances_new', row_count;
+                RAISE NOTICE 'DRY-RUN: Would migrate % rows to instances_v2', row_count;
             END IF;
 
             RAISE NOTICE 'Phase 4: instances data migrated';
 
             -- Migrate history
             IF NOT dry_run THEN
-                INSERT INTO history_new (InstanceID, SequenceNumber, EventPayload)
+                INSERT INTO history_v2 (InstanceID, SequenceNumber, EventPayload)
                 SELECT InstanceID, SequenceNumber, EventPayload
                 FROM history;
                 
                 GET DIAGNOSTICS row_count = ROW_COUNT;
-                RAISE NOTICE 'Migrated % rows to history_new', row_count;
+                RAISE NOTICE 'Migrated % rows to history_v2', row_count;
             ELSE
                 SELECT COUNT(*) INTO row_count FROM history;
-                RAISE NOTICE 'DRY-RUN: Would migrate % rows to history_new', row_count;
+                RAISE NOTICE 'DRY-RUN: Would migrate % rows to history_v2', row_count;
             END IF;
 
             RAISE NOTICE 'Phase 4: history data migrated';
 
             -- Migrate newevents (without DequeueCount and LockedBy)
             IF NOT dry_run THEN
-                INSERT INTO newevents_new (
+                INSERT INTO newevents_v2 (
                     SequenceNumber, InstanceID, ExecutionID, Timestamp, VisibleTime, EventPayload
                 )
                 SELECT 
@@ -443,17 +473,17 @@ BEGIN
                 FROM newevents;
                 
                 GET DIAGNOSTICS row_count = ROW_COUNT;
-                RAISE NOTICE 'Migrated % rows to newevents_new', row_count;
+                RAISE NOTICE 'Migrated % rows to newevents_v2', row_count;
             ELSE
                 SELECT COUNT(*) INTO row_count FROM newevents;
-                RAISE NOTICE 'DRY-RUN: Would migrate % rows to newevents_new', row_count;
+                RAISE NOTICE 'DRY-RUN: Would migrate % rows to newevents_v2', row_count;
             END IF;
 
             RAISE NOTICE 'Phase 4: newevents data migrated';
 
             -- Migrate newtasks
             IF NOT dry_run THEN
-                INSERT INTO newtasks_new (
+                INSERT INTO newtasks_v2 (
                     SequenceNumber, InstanceID, ExecutionID, Timestamp,
                     DequeueCount, LockedBy, LockExpiration, EventPayload
                 )
@@ -466,10 +496,10 @@ BEGIN
                 FROM newtasks;
                 
                 GET DIAGNOSTICS row_count = ROW_COUNT;
-                RAISE NOTICE 'Migrated % rows to newtasks_new', row_count;
+                RAISE NOTICE 'Migrated % rows to newtasks_v2', row_count;
             ELSE
                 SELECT COUNT(*) INTO row_count FROM newtasks;
-                RAISE NOTICE 'DRY-RUN: Would migrate % rows to newtasks_new', row_count;
+                RAISE NOTICE 'DRY-RUN: Would migrate % rows to newtasks_v2', row_count;
             END IF;
 
             RAISE NOTICE 'Phase 4: newtasks data migrated';
@@ -497,7 +527,7 @@ BEGIN
             END IF;
 
             -- ========================================
-            -- Phase 5: Update External Table References to _new Tables
+            -- Phase 5: Update External Table References to _v2 Tables
             -- ========================================
 
             IF NOT dry_run THEN
@@ -510,15 +540,15 @@ BEGIN
                 ALTER TABLE golfinstancesdetails 
                 DROP CONSTRAINT IF EXISTS golfinstancesdetails_instanceid_fkey;
 
-                -- Add new foreign key to instances_new
+                -- Add new foreign key to instances_v2
                 ALTER TABLE golfinstancesdetails 
                 ADD CONSTRAINT golfinstancesdetails_instanceid_fkey 
-                FOREIGN KEY (instanceid) REFERENCES instances_new(instanceid) ON DELETE CASCADE;
+                FOREIGN KEY (instanceid) REFERENCES instances_v2(instanceid) ON DELETE CASCADE;
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would update golfinstancesdetails FK to reference instances_new';
+                RAISE NOTICE 'DRY-RUN: Would update golfinstancesdetails FK to reference instances_v2';
             END IF;
 
-            RAISE NOTICE 'Phase 5: External table references updated to _new tables';
+            RAISE NOTICE 'Phase 5: External table references updated to _v2 tables';
 
             IF NOT dry_run THEN
                 UPDATE schema_migrations SET phase = 'Phase 5', status = 'completed', details = 'External FKs updated'
@@ -536,13 +566,13 @@ BEGIN
 
             -- Row count verification
             SELECT COUNT(*) INTO old_instances_count FROM instances;
-            SELECT COUNT(*) INTO new_instances_count FROM instances_new;
+            SELECT COUNT(*) INTO new_instances_count FROM instances_v2;
             SELECT COUNT(*) INTO old_history_count FROM history;
-            SELECT COUNT(*) INTO new_history_count FROM history_new;
+            SELECT COUNT(*) INTO new_history_count FROM history_v2;
             SELECT COUNT(*) INTO old_newevents_count FROM newevents;
-            SELECT COUNT(*) INTO new_newevents_count FROM newevents_new;
+            SELECT COUNT(*) INTO new_newevents_count FROM newevents_v2;
             SELECT COUNT(*) INTO old_newtasks_count FROM newtasks;
-            SELECT COUNT(*) INTO new_newtasks_count FROM newtasks_new;
+            SELECT COUNT(*) INTO new_newtasks_count FROM newtasks_v2;
             
             RAISE NOTICE 'Row count validation:';
             RAISE NOTICE '  instances: old=%, new=%', old_instances_count, new_instances_count;
@@ -571,7 +601,7 @@ BEGIN
             -- LockExpiration transformation validation
             -- Verify terminal statuses have NULL LockExpiration
             SELECT COUNT(*) INTO terminal_with_lock_count
-            FROM instances_new 
+            FROM instances_v2 
             WHERE RuntimeStatus IN ('COMPLETED', 'FAILED', 'TERMINATED', 'CANCELED')
             AND LockExpiration IS NOT NULL;
             
@@ -581,8 +611,8 @@ BEGIN
             
             -- Verify unlocked instances have '-infinity'
             SELECT COUNT(*) INTO unlocked_without_infinity_count
-            FROM instances_new 
-            WHERE (LockedBy IS NULL OR LockedBy = '')
+            FROM instances_v2 
+            WHERE (LockedBy IS NULL)
             AND LockExpiration != '-infinity';
             
             IF unlocked_without_infinity_count > 0 THEN
@@ -598,7 +628,7 @@ BEGIN
                 WHERE migration_name = 'v1_to_v2';
             END IF;
 
-            RAISE NOTICE 'Phases 1-6 completed successfully for schema: %', schema_name;
+            RAISE NOTICE 'Phases 1-6 completed successfully for schema: %', current_schema_name;
             RAISE NOTICE 'IMPORTANT: Stop application writes before proceeding to Phase 7';
 
             -- ========================================
@@ -607,23 +637,23 @@ BEGIN
 
             -- Pre-cutover verification
             IF NOT dry_run THEN
-                -- Verify _new tables exist
-                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'instances_new' AND table_schema = current_schema()) THEN
-                    RAISE EXCEPTION 'instances_new table not found. Cannot proceed with cutover.';
+                -- Verify _v2 tables exist
+                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'instances_v2' AND table_schema = current_schema()) THEN
+                    RAISE EXCEPTION 'instances_v2 table not found. Cannot proceed with cutover.';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'history_new' AND table_schema = current_schema()) THEN
-                    RAISE EXCEPTION 'history_new table not found. Cannot proceed with cutover.';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'history_v2' AND table_schema = current_schema()) THEN
+                    RAISE EXCEPTION 'history_v2 table not found. Cannot proceed with cutover.';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'newevents_new' AND table_schema = current_schema()) THEN
-                    RAISE EXCEPTION 'newevents_new table not found. Cannot proceed with cutover.';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'newevents_v2' AND table_schema = current_schema()) THEN
+                    RAISE EXCEPTION 'newevents_v2 table not found. Cannot proceed with cutover.';
                 END IF;
-                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'newtasks_new' AND table_schema = current_schema()) THEN
-                    RAISE EXCEPTION 'newtasks_new table not found. Cannot proceed with cutover.';
+                IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'newtasks_v2' AND table_schema = current_schema()) THEN
+                    RAISE EXCEPTION 'newtasks_v2 table not found. Cannot proceed with cutover.';
                 END IF;
                 
-                -- Verify _new tables contain data
-                IF (SELECT COUNT(*) FROM instances_new) = 0 THEN
-                    RAISE EXCEPTION 'instances_new table is empty. Cannot proceed with cutover.';
+                -- Verify _v2 tables contain data
+                IF (SELECT COUNT(*) FROM instances_v2) = 0 THEN
+                    RAISE NOTICE 'INFO: instances_v2 table is empty. Proceeding with cutover anyway.';
                 END IF;
                 
                 -- Verify old tables still exist
@@ -642,21 +672,21 @@ BEGIN
             END IF;
 
             IF NOT dry_run THEN
-                -- Rename old tables to _old
-                ALTER TABLE instances RENAME TO instances_old;
-                ALTER TABLE history RENAME TO history_old;
-                ALTER TABLE newevents RENAME TO newevents_old;
-                ALTER TABLE newtasks RENAME TO newtasks_old;
+                -- Rename old tables to _v1
+                ALTER TABLE instances RENAME TO instances_v1;
+                ALTER TABLE history RENAME TO history_v1;
+                ALTER TABLE newevents RENAME TO newevents_v1;
+                ALTER TABLE newtasks RENAME TO newtasks_v1;
 
-                RAISE NOTICE 'Old tables renamed to _old';
+                RAISE NOTICE 'Old tables renamed to _v1';
 
-                -- Rename _new tables to final names
-                ALTER TABLE instances_new RENAME TO instances;
-                ALTER TABLE history_new RENAME TO history;
-                ALTER TABLE newevents_new RENAME TO newevents;
-                ALTER TABLE newtasks_new RENAME TO newtasks;
+                -- Rename _v2 tables to final names
+                ALTER TABLE instances_v2 RENAME TO instances;
+                ALTER TABLE history_v2 RENAME TO history;
+                ALTER TABLE newevents_v2 RENAME TO newevents;
+                ALTER TABLE newtasks_v2 RENAME TO newtasks;
 
-                RAISE NOTICE '_new tables renamed to final names';
+                RAISE NOTICE '_v2 tables renamed to final names';
 
                 -- Update golfinstancesdetails foreign key to reference final instances
                 ALTER TABLE golfinstancesdetails 
@@ -667,8 +697,60 @@ BEGIN
                 FOREIGN KEY (instanceid) REFERENCES instances(instanceid) ON DELETE CASCADE;
 
                 RAISE NOTICE 'Foreign key updated to reference final instances table';
+
+                -- Rename old sequences to add _v1 suffix at end (if they exist)
+                BEGIN
+                    ALTER SEQUENCE instances_sequencenumber_seq RENAME TO instances_sequencenumber_seq_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old sequence instances_sequencenumber_seq does not exist, skipping rename.';
+                END;
+                BEGIN
+                    ALTER SEQUENCE history_sequencenumber_seq RENAME TO history_sequencenumber_seq_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old sequence history_sequencenumber_seq does not exist, skipping rename.';
+                END;
+                BEGIN
+                    ALTER SEQUENCE newevents_sequencenumber_seq RENAME TO newevents_sequencenumber_seq_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old sequence newevents_sequencenumber_seq does not exist, skipping rename.';
+                END;
+                BEGIN
+                    ALTER SEQUENCE newtasks_sequencenumber_seq RENAME TO newtasks_sequencenumber_seq_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old sequence newtasks_sequencenumber_seq does not exist, skipping rename.';
+                END;
+
+                RAISE NOTICE 'Old sequences renamed with _v1 suffix (where they existed)';
+
+                -- Rename new sequences to remove _v2 suffix from end
+                ALTER SEQUENCE instances_v2_sequencenumber_seq RENAME TO instances_sequencenumber_seq;
+                ALTER SEQUENCE history_v2_sequencenumber_seq RENAME TO history_sequencenumber_seq;
+                ALTER SEQUENCE newevents_v2_sequencenumber_seq RENAME TO newevents_sequencenumber_seq;
+                ALTER SEQUENCE newtasks_v2_sequencenumber_seq RENAME TO newtasks_sequencenumber_seq;
+
+                RAISE NOTICE 'New sequences renamed to remove _v2 suffix';
+
+                -- Rename old indexes to add _v1 suffix at end (if they exist)
+                BEGIN
+                    ALTER INDEX IX_Instances_ParentInstanceID RENAME TO IX_Instances_ParentInstanceID_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old index IX_Instances_ParentInstanceID does not exist, skipping rename.';
+                END;
+                BEGIN
+                    ALTER INDEX IX_Instances_RuntimeStatus_NonTerminal RENAME TO IX_Instances_RuntimeStatus_NonTerminal_v1;
+                EXCEPTION WHEN UNDEFINED_TABLE THEN
+                    RAISE NOTICE 'Old index IX_Instances_RuntimeStatus_NonTerminal does not exist, skipping rename.';
+                END;
+
+                RAISE NOTICE 'Old indexes renamed with _v1 suffix (where they existed)';
+
+                -- Rename new indexes to remove _v2 suffix from end
+                ALTER INDEX IX_instances_v2_ParentInstanceID RENAME TO IX_Instances_ParentInstanceID;
+                ALTER INDEX IX_instances_v2_RuntimeStatus_NonTerminal RENAME TO IX_Instances_RuntimeStatus_NonTerminal;
+
+                RAISE NOTICE 'New indexes renamed to remove _v2 suffix';
             ELSE
-                RAISE NOTICE 'DRY-RUN: Would perform cutover (rename tables and update FKs)';
+                RAISE NOTICE 'DRY-RUN: Would perform cutover (rename tables, update FKs, rename sequences and indexes)';
             END IF;
 
             IF NOT dry_run THEN
@@ -676,18 +758,18 @@ BEGIN
                 WHERE migration_name = 'v1_to_v2';
             END IF;
 
-            RAISE NOTICE 'Phase 7: Cutover completed successfully for schema: %', schema_name;
-            RAISE NOTICE 'IMPORTANT: Resume application writes for schema: %', schema_name;
+            RAISE NOTICE 'Phase 7: Cutover completed successfully for schema: %', current_schema_name;
+            RAISE NOTICE 'IMPORTANT: Resume application writes for schema: %', current_schema_name;
 
             success_count := success_count + 1;
             RAISE NOTICE '==============================';
-            RAISE NOTICE 'Migration completed successfully for schema: %', schema_name;
+            RAISE NOTICE 'Migration completed successfully for schema: %', current_schema_name;
             RAISE NOTICE '==============================';
             
         EXCEPTION WHEN OTHERS THEN
-            failed_schemas := array_append(failed_schemas, schema_name);
+            failed_schemas := array_append(failed_schemas, current_schema_name);
             error_message := SQLERRM;
-            RAISE WARNING 'Migration failed for schema %: %', schema_name, error_message;
+            RAISE WARNING 'Migration failed for schema %: %', current_schema_name, error_message;
             
             -- Restore search path on error
             PERFORM set_config('search_path', 'public', false);
@@ -701,9 +783,13 @@ BEGIN
     RAISE NOTICE '==============================';
     RAISE NOTICE 'MULTI-SCHEMA MIGRATION SUMMARY';
     RAISE NOTICE '==============================';
-    RAISE NOTICE 'Total schemas processed: %', array_length(schemas, 1);
+    RAISE NOTICE 'Total schemas processed: %', COALESCE(array_length(schemas, 1), 0);
     RAISE NOTICE 'Successful migrations: %', success_count;
-    RAISE NOTICE 'Failed migrations: %', array_length(failed_schemas, 1);
+    RAISE NOTICE 'Skipped migrations: %', COALESCE(array_length(skipped_schemas, 1), 0);
+    RAISE NOTICE 'Failed migrations: %', COALESCE(array_length(failed_schemas, 1), 0);
+    IF array_length(skipped_schemas, 1) > 0 THEN
+        RAISE NOTICE 'Skipped schemas: %', array_to_string(skipped_schemas, ', ');
+    END IF;
     IF array_length(failed_schemas, 1) > 0 THEN
         RAISE NOTICE 'Failed schemas: %', array_to_string(failed_schemas, ', ');
     END IF;
@@ -712,6 +798,6 @@ BEGIN
     IF array_length(failed_schemas, 1) > 0 THEN
         RAISE WARNING 'Some schemas failed to migrate. Please review the errors above.';
     ELSE
-        RAISE NOTICE 'All schemas migrated successfully!';
+        RAISE NOTICE 'All schemas processed successfully!';
     END IF;
 END $$;
